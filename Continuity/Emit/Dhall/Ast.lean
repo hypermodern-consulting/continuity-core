@@ -4,15 +4,12 @@
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-!
-  Dhall AST — abstract syntax for the Dhall configuration language.
+  Dhall AST — near-complete abstract syntax for the Dhall configuration language.
 
-  This is NOT a codec target. Dhall is the render target for build descriptions:
-  triples, toolchains, rules, derivations. The structures in Build/ are the
-  source of truth; this AST is the shape of the output.
-
-  We model a minimal subset of Dhall — just enough to emit readable build
-  configurations. No imports, no type inference, no normalization. If Dhall
-  has it and we don't emit it, it's not here.
+  This covers the full expression grammar minus: Date/Time/TimeZone literals,
+  Bytes literals, Double literals, URL imports, import alternatives (`?`),
+  `showConstructor`, and de Bruijn indices on variables (we generate unique
+  names). Everything else you can write in Dhall, you can emit from here.
 
   cf. https://github.com/dhall-lang/dhall-lang/blob/master/standard/README.md
 -/
@@ -21,83 +18,183 @@ namespace Continuity.Emit.Dhall
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
+                                                            // binary operators
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+/-- Dhall binary operators, in precedence order (low to high) -/
+inductive BinOp where
+  /-- `a === b` — equivalence (for assert) -/
+  | equiv
+  /-- `a // b` — right-biased record merge (⫽) -/
+  | prefer
+  /-- `a //\\ b` — recursive record type merge (⩓) -/
+  | combine
+  /-- `a /\ b` — recursive record merge (∧) -/
+  | combineTypes
+  /-- `a # b` — list append -/
+  | listAppend
+  /-- `a ++ b` — text append -/
+  | textAppend
+  /-- `a || b` — boolean or -/
+  | boolOr
+  /-- `a && b` — boolean and -/
+  | boolAnd
+  /-- `a == b` — boolean equality -/
+  | boolEq
+  /-- `a != b` — boolean inequality -/
+  | boolNe
+  /-- `a + b` — natural addition -/
+  | natPlus
+  /-- `a * b` — natural multiplication -/
+  | natTimes
+  deriving Repr, DecidableEq, Inhabited
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                                     // imports
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+/-- How to interpret an import's content -/
+inductive ImportMode where
+  /-- default: parse as Dhall expression -/
+  | code
+  /-- `as Text`: import as raw Text -/
+  | asText
+  /-- `as Bytes`: import as raw Bytes -/
+  | asBytes
+  /-- `as Location`: import as a Location value -/
+  | asLocation
+  deriving Repr, DecidableEq, Inhabited
+
+/-- An import reference -/
+inductive Import where
+  /-- local file: `./path/to/file.dhall` -/
+  | file (path : String)
+  /-- parent traversal: `../path/to/file.dhall` -/
+  | parentFile (path : String)
+  /-- absolute: `/path/to/file.dhall` -/
+  | absFile (path : String)
+  /-- home-anchored: `~/path/to/file.dhall` -/
+  | homeFile (path : String)
+  /-- environment variable: `env:VAR` -/
+  | env (name : String)
+  /-- `missing` — always fails, used as import alternative fallback -/
+  | missing
+  deriving Repr, DecidableEq, Inhabited
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
                                                                   // expressions
    ════════════════════════════════════════════════════════════════════════════════ -/
 
-/-- A Dhall expression.
-
-    This is the single AST type. Dhall is expression-oriented — there are no
-    statements. A Dhall file is one expression, usually a record or a let chain
-    that bottoms out in a record. -/
+/-- A Dhall expression. This covers the full surface syntax minus the
+    omissions listed in the module doc. -/
 inductive Expr where
-  /-- boolean literal: `True` or `False` -/
+
+  -- ── literals ──────────────────────────────────────────────────────────────
+
+  /-- `True` or `False` -/
   | bool (value : Bool)
-
-  /-- natural number literal: `42` -/
+  /-- `42` -/
   | natural (value : Nat)
-
-  /-- integer literal: `+3` or `-7`.
-      n.b. dhall integers are always signed and always prefixed -/
+  /-- `+3` or `-7` -/
   | integer (value : Int)
-
-  /-- double-quoted text: `"hello world"` -/
+  /-- `"hello"` — double-quoted text -/
   | text (value : String)
-
-  /-- text with interpolations: `"prefix ${expr} suffix"`.
-      segments alternate: text, expr, text, expr, ..., text.
-      the text list is always one longer than the expr list -/
+  /-- `"prefix ${expr} suffix"` — text with interpolations.
+      texts and exprs alternate: texts[0] exprs[0] texts[1] exprs[1] ... texts[n] -/
   | interpolation (texts : List String) (exprs : List Expr)
+  /-- `'' multi-line ${expr} text ''` — multi-line text with interpolations.
+      same alternating structure as interpolation. leading whitespace is
+      stripped per dhall spec, but we emit verbatim — the caller handles
+      indentation -/
+  | textBlock (texts : List String) (exprs : List Expr)
+
+  -- ── references ────────────────────────────────────────────────────────────
 
   /-- variable reference: `x` -/
   | var (name : String)
+  /-- import: `./file.dhall`, `env:VAR`, `missing` -/
+  | import_ (ref : Import) (mode : ImportMode) (integrity : Option String)
 
-  /-- list literal: `[1, 2, 3]`.
-      for empty lists, provide a type: `[] : List Natural` -/
+  -- ── collections ───────────────────────────────────────────────────────────
+
+  /-- `[1, 2, 3]` or `[] : List Natural` -/
   | list (elements : List Expr) (emptyType : Option Expr)
-
-  /-- record literal: `{ arch = "x86_64", os = "linux" }`.
-      fields are name-expression pairs. order is preserved as written -/
+  /-- `{ name = "foo", version = 1 }` -/
   | record (fields : List (String × Expr))
-
-  /-- record type: `{ arch : Text, os : Text }` -/
+  /-- `{ name : Text, version : Natural }` -/
   | recordType (fields : List (String × Expr))
-
-  /-- field access: `r.arch` -/
+  /-- `r.name` — field access -/
   | field (expr : Expr) (name : String)
+  /-- `r.{ name, version }` — record projection by field names -/
+  | project (expr : Expr) (fieldNames : List String)
+  /-- `r.(T)` — record projection by type -/
+  | projectType (expr : Expr) (ty : Expr)
 
-  /-- union type: `< x86_64 | aarch64 | riscv64 >` -/
+  -- ── unions ────────────────────────────────────────────────────────────────
+
+  /-- `< x86_64 | aarch64 | riscv64 >` -/
   | unionType (alternatives : List (String × Option Expr))
-
-  /-- union value: `< Arch >.x86_64` or with payload -/
+  /-- union constructor applied: `< Arch >.x86_64` -/
   | unionVal (typeName : String) (alternatives : List (String × Option Expr))
              (tag : String) (value : Option Expr)
 
-  /-- lambda: `λ(x : Natural) → x + 1` -/
-  | lambda (param : String) (paramType : Expr) (body : Expr)
+  -- ── functions ─────────────────────────────────────────────────────────────
 
-  /-- function application: `f x` -/
+  /-- `λ(x : Natural) → x + 1` -/
+  | lambda (param : String) (paramType : Expr) (body : Expr)
+  /-- `∀(x : Natural) → x < 10` — pi / forall type -/
+  | forallE (param : String) (paramType : Expr) (body : Expr)
+  /-- `f x` — function application -/
   | app (fn : Expr) (arg : Expr)
 
-  /-- let binding: `let x : T = e in body`.
-      type annotation is optional -/
-  | letIn (name : String) (ty : Option Expr) (value : Expr) (body : Expr)
+  -- ── binding ───────────────────────────────────────────────────────────────
 
-  /-- type annotation: `expr : Type` -/
+  /-- `let x : T = e in body` — type annotation optional -/
+  | letIn (name : String) (ty : Option Expr) (value : Expr) (body : Expr)
+  /-- `if c then t else f` -/
+  | ite (cond : Expr) (thenBranch : Expr) (elseBranch : Expr)
+
+  -- ── operators ─────────────────────────────────────────────────────────────
+
+  /-- binary operator application: `a op b` -/
+  | binop (op : BinOp) (lhs : Expr) (rhs : Expr)
+  /-- `T::r` — completion (fill defaults from type) -/
+  | completion (ty : Expr) (value : Expr)
+  /-- `r with a.b.c = x` — deep record update -/
+  | with (expr : Expr) (path : List String) (value : Expr)
+
+  -- ── type annotation ───────────────────────────────────────────────────────
+
+  /-- `expr : Type` -/
   | annot (expr : Expr) (ty : Expr)
 
-  /-- optional present: `Some 42` -/
-  | some (value : Expr)
+  -- ── optional ──────────────────────────────────────────────────────────────
 
-  /-- optional absent: `None Natural` -/
+  /-- `Some 42` -/
+  | some (value : Expr)
+  /-- `None Natural` -/
   | none (ty : Expr)
 
-  /-- built-in type name: `Natural`, `Text`, `Bool`, `List`, `Optional` -/
+  -- ── builtins ──────────────────────────────────────────────────────────────
+
+  /-- built-in name: `Natural`, `Text`, `Bool`, `List`, `Optional`,
+      `Type`, `Kind`, `Natural/fold`, `List/map`, etc. -/
   | builtin (name : String)
 
-  /-- merge expression: `merge { Left = ..., Right = ... } union` -/
-  | merge (handler : Expr) (union : Expr) (ty : Option Expr)
+  -- ── special forms ─────────────────────────────────────────────────────────
 
-  /-- raw comment attached to an expression, rendered above it -/
+  /-- `merge { Left = f, Right = g } union : T` -/
+  | merge (handler : Expr) (union : Expr) (ty : Option Expr)
+  /-- `toMap { x = 1, y = 2 } : List { mapKey : Text, mapValue : Natural }` -/
+  | toMap (expr : Expr) (ty : Option Expr)
+  /-- `assert : x === y` -/
+  | assert (annot : Expr)
+
+  -- ── metadata ──────────────────────────────────────────────────────────────
+
+  /-- `{- comment -}` attached above an expression -/
   | comment (text : String) (body : Expr)
 
   deriving Repr, Inhabited
@@ -107,23 +204,18 @@ inductive Expr where
                                                                  // combinators
    ════════════════════════════════════════════════════════════════════════════════ -/
 
-/-! thin helpers for building AST values. these exist to keep call sites
-    readable — every one is a one-liner that saves keystrokes and
-    makes intent clearer.
-
-    n.b. we define these outside the inductive because lean needs
-    the type to be fully elaborated before we can write functions on it. -/
+/-! thin helpers. every one is a one-liner. -/
 
 namespace Expr
 
--- ── literals ──────────────────────────────────────────────────────────────────
+-- ── literal shortcuts ─────────────────────────────────────────────────────────
 
 def nat (n : Nat) : Expr := Expr.natural n
 def str (s : String) : Expr := Expr.text s
 def tt : Expr := Expr.bool true
 def ff : Expr := Expr.bool false
 
--- ── types ─────────────────────────────────────────────────────────────────────
+-- ── type shortcuts ────────────────────────────────────────────────────────────
 
 def ty (name : String) : Expr := Expr.builtin name
 
@@ -133,38 +225,60 @@ def listOf (elemType : Expr) : Expr :=
 def optionalOf (elemType : Expr) : Expr :=
   Expr.app (Expr.builtin "Optional") elemType
 
--- ── collections ───────────────────────────────────────────────────────────────
+-- ── collection shortcuts ──────────────────────────────────────────────────────
 
-/-- non-empty list (no type annotation needed) -/
 def listLit (elements : List Expr) : Expr :=
   Expr.list elements Option.none
 
-/-- empty list with type: `[] : List Natural` -/
 def emptyList (elemType : Expr) : Expr :=
   Expr.list [] (Option.some elemType)
 
--- ── binding ───────────────────────────────────────────────────────────────────
+-- ── binding shortcuts ─────────────────────────────────────────────────────────
 
-/-- chain of let bindings: `let a = ... in let b = ... in body` -/
 def letChain (bindings : List (String × Option Expr × Expr)) (body : Expr) : Expr :=
   bindings.foldr (fun (name, ty, value) acc => Expr.letIn name ty value acc) body
 
-/-- apply a function to multiple arguments left-to-right -/
 def apps (fn : Expr) (args : List Expr) : Expr :=
   args.foldl (fun acc arg => Expr.app acc arg) fn
 
--- ── union shorthand ───────────────────────────────────────────────────────────
+-- ── union shortcuts ───────────────────────────────────────────────────────────
 
-/-- simple enum union: `< A | B | C >` (no payloads) -/
 def enum (alternatives : List String) : Expr :=
   Expr.unionType (alternatives.map fun a => (a, Option.none))
 
-/-- simple enum value: `< A | B | C >.B` -/
 def enumVal (typeName : String) (alternatives : List String) (tag : String) : Expr :=
   Expr.unionVal typeName
     (alternatives.map fun a => (a, Option.none))
     tag
     Option.none
+
+-- ── operator shortcuts ────────────────────────────────────────────────────────
+
+def recordMerge (lhs : Expr) (rhs : Expr) : Expr :=
+  Expr.binop BinOp.prefer lhs rhs
+
+def listConcat (lhs : Expr) (rhs : Expr) : Expr :=
+  Expr.binop BinOp.listAppend lhs rhs
+
+def textConcat (lhs : Expr) (rhs : Expr) : Expr :=
+  Expr.binop BinOp.textAppend lhs rhs
+
+-- ── import shortcuts ──────────────────────────────────────────────────────────
+
+def importFile (path : String) : Expr :=
+  Expr.import_ (Import.file path) ImportMode.code Option.none
+
+def importFileAsText (path : String) : Expr :=
+  Expr.import_ (Import.file path) ImportMode.asText Option.none
+
+def importEnv (name : String) : Expr :=
+  Expr.import_ (Import.env name) ImportMode.code Option.none
+
+-- ── non-dependent function type ───────────────────────────────────────────────
+
+/-- `A → B` — non-dependent function type. rendered as `∀(_ : A) → B` -/
+def arrow (domain : Expr) (codomain : Expr) : Expr :=
+  Expr.forallE "_" domain codomain
 
 end Expr
 
@@ -173,11 +287,7 @@ end Expr
                                                            // top-level module
    ════════════════════════════════════════════════════════════════════════════════ -/
 
-/-- A complete Dhall file.
-
-    In practice a generated Dhall file is a single expression, usually a let
-    chain. This structure gives us a place to hang the file-level comment
-    header without stuffing it into the expression tree. -/
+/-- A complete Dhall file. -/
 structure Module where
   /-- file-level comment block, rendered before the expression -/
   header : Option String := Option.none
