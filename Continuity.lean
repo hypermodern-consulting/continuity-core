@@ -5,3 +5,5 @@ import Continuity.Emit.Dhall.Build
 import Continuity.Emit.Haskell.Ast
 import Continuity.Emit.Haskell.Render
 import Continuity.Emit.Haskell.Build
+import Continuity.Emit.Cpp.Ast
+import Continuity.Emit.Cpp.Render
