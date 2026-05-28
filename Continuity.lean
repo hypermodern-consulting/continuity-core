@@ -8,3 +8,4 @@ import Continuity.Emit.Haskell.Build
 import Continuity.Emit.Cpp.Ast
 import Continuity.Emit.Cpp.Render
 import Continuity.Emit.Cpp.Build
+import Continuity.Codec.Box
