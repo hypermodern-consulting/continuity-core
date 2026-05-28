@@ -1,0 +1,23 @@
+# Lake build artifacts
+.lake/
+lake-packages/
+lake-manifest.json
+build/
+
+# Lean build artifacts
+*.olean
+*.ilean
+*.trace
+
+# Nix
+result
+result-*
+
+# Editor
+*~
+\#*\#
+.#*
+*.swp
+
+# OS
+.DS_Store
