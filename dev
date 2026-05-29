@@ -135,7 +135,7 @@ cmd_run() {
     buck2 build //:continuity 2>/dev/null
     OUTPUT=$(buck2 build //:continuity --show-output 2>&1 | grep 'root//:continuity ' | awk '{print $2}')
     chmod +x "$OUTPUT" 2>/dev/null
-    shift 2>/dev/null || true
+
     "$OUTPUT" "$@"
 }
 
