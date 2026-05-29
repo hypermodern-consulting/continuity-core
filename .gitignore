@@ -21,3 +21,5 @@ result-*
 
 # OS
 .DS_Store
+buck-out/
+.lake/
