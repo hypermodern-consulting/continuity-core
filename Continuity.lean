@@ -27,3 +27,4 @@ import Continuity.Build.Nv
 import Continuity.Build.Genrule
 import Continuity.Build.Rule
 import Continuity.Codegen.Build.ToDhall
+import Continuity.Codec.Dhall.Lexer
