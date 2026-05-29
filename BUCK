@@ -1,4 +1,4 @@
-load("@toolchains//:lean.bzl", "lean_library", "lean_binary")
+load("@toolchains//:lean.bzl", "lean_binary", "lean_library")
 
 lean_library(
     name = "continuity-lib",

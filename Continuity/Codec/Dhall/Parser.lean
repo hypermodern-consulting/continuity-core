@@ -2,10 +2,9 @@ import Continuity.Codec.Dhall.Lexer
 import Continuity.Emit.Dhall.Ast
 import Continuity.Emit.Dhall.Render
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                // continuity // codec // dhall
-                                                                    parser.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                           // continuity // codec // dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-!
   Dhall parser — recursive descent from tokens to `Emit.Dhall.Expr`.
@@ -33,9 +32,9 @@ namespace Continuity.Codec.Dhall
 open Continuity.Emit.Dhall
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // parse monad
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ══════════════════════════════════════════════════════════════════════
+                                                        // parse // monad
+   ══════════════════════════════════════════════════════════════════════ -/
 
 /-- Parse state: remaining tokens. Result: parsed value + remaining tokens, or failure. -/
 abbrev P (α : Type) := List Tok → Option (α × List Tok)
@@ -66,9 +65,9 @@ private def str : P String
   | _                => Option.none
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                         // recursive descent
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ══════════════════════════════════════════════════════════════════════
+                                                     // recursive descent
+   ══════════════════════════════════════════════════════════════════════ -/
 
 mutual
 
@@ -153,15 +152,18 @@ partial def parseAnnot (ts : List Tok) : Option (Expr × List Tok) := do
     `f x y` = `app (app f x) y` -/
 partial def parseAppExpr (ts : List Tok) : Option (Expr × List Tok) := do
   let (first, ts) ← parseSelectExpr ts
+  
   let rec go (acc : Expr) (ts : List Tok) : Expr × List Tok :=
     match parseSelectExpr ts with
     | Option.some (arg, ts') => go (Expr.app acc arg) ts'
     | Option.none            => (acc, ts)
+    
   pure (go first ts)
 
 /-- Field selection: `expr.field1.field2` -/
 partial def parseSelectExpr (ts : List Tok) : Option (Expr × List Tok) := do
   let (e, ts) ← parseAtom ts
+  
   let rec go (acc : Expr) (ts : List Tok) : Expr × List Tok :=
     match ts with
     | Tok.dot :: Tok.ident name :: ts' => go (Expr.field acc name) ts'
@@ -171,6 +173,7 @@ partial def parseSelectExpr (ts : List Tok) : Option (Expr × List Tok) := do
       | Option.some (names, ts'') => go (Expr.project acc names) ts''
       | Option.none => (acc, ts)
     | _ => (acc, ts)
+    
   pure (go e ts)
 
 /-- Parse a single atom. -/
@@ -322,9 +325,9 @@ partial def parseIdentList (ts : List Tok) : Option (List String × List Tok) :=
 end
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // public API
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════
+                                                           // public // API
+   ════════════════════════════════════════════════════════════════════════ -/
 
 /-- Parse a Dhall expression from a string. -/
 def parse (input : String) : Option Expr := do
@@ -334,9 +337,9 @@ def parse (input : String) : Option Expr := do
   pure expr
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                       // tests
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ═══════════════════════════════════════════════════════════════════════
+                                                                  // tests
+   ═══════════════════════════════════════════════════════════════════════ -/
 
 -- atoms
 #eval parse "42"

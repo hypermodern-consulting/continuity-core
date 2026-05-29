@@ -57,10 +57,12 @@ def _lean_library_impl(ctx: AnalysisContext) -> list[Provider]:
         # Create directory structure in scratch and olean dirs
         if rel_dir:
             script_parts.append("mkdir -p $BUCK_SCRATCH_PATH/{} $OLEAN_DIR/{}".format(rel_dir, rel_dir))
-        
+
         # Copy preserving hierarchy
         script_parts.append(cmd_args(
-            "cp", src, "$BUCK_SCRATCH_PATH/{}".format(rel_path),
+            "cp",
+            src,
+            "$BUCK_SCRATCH_PATH/{}".format(rel_path),
             delimiter = " ",
         ))
 
@@ -71,7 +73,8 @@ def _lean_library_impl(ctx: AnalysisContext) -> list[Provider]:
         compile_cmd = [
             lean,
             "--root=$BUCK_SCRATCH_PATH",
-            "-o", olean_path,
+            "-o",
+            olean_path,
             "--c={}".format(c_path),
             "$BUCK_SCRATCH_PATH/{}".format(rel_path),
         ]
@@ -81,11 +84,15 @@ def _lean_library_impl(ctx: AnalysisContext) -> list[Provider]:
 
     ctx.actions.run(
         cmd_args(
-            "/bin/sh", "-c",
+            "/bin/sh",
+            "-c",
             cmd_args(
-                "OLEAN_DIR=", olean_dir.as_output(),
-                " C_DIR=", c_dir.as_output(),
-                " && ", script,
+                "OLEAN_DIR=",
+                olean_dir.as_output(),
+                " C_DIR=",
+                c_dir.as_output(),
+                " && ",
+                script,
                 delimiter = "",
             ),
         ),
@@ -139,7 +146,9 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     # Copy dep oleans into scratch so lean's --root resolution finds them
     for d in dep_olean_dirs:
         script_parts.append(cmd_args(
-            "cp -rn", cmd_args(d, "/.", delimiter = ""), "$BUCK_SCRATCH_PATH/",
+            "cp -rn",
+            cmd_args(d, "/.", delimiter = ""),
+            "$BUCK_SCRATCH_PATH/",
             delimiter = " ",
         ))
 
@@ -152,7 +161,9 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
             script_parts.append("mkdir -p $BUCK_SCRATCH_PATH/{} $OLEAN_DIR/{}".format(rel_dir, rel_dir))
 
         script_parts.append(cmd_args(
-            "cp", src, "$BUCK_SCRATCH_PATH/{}".format(rel_path),
+            "cp",
+            src,
+            "$BUCK_SCRATCH_PATH/{}".format(rel_path),
             delimiter = " ",
         ))
 
@@ -163,7 +174,8 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
         compile_cmd = [
             lean,
             "--root=$BUCK_SCRATCH_PATH",
-            "-o", olean_path,
+            "-o",
+            olean_path,
             "--c={}".format(c_file),
             "$BUCK_SCRATCH_PATH/{}".format(rel_path),
         ]
@@ -173,6 +185,7 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     link_parts = [leanc, "-o", cmd_args(exe.as_output())]
     for c_file in c_files:
         link_parts.append(c_file)
+
     # Add dep C files via find
     for d in dep_c_dirs:
         script_parts.append(cmd_args("DEP_C_FILES=\"$(find ", d, " -name '*.c')\"", delimiter = ""))
@@ -187,11 +200,15 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
 
     ctx.actions.run(
         cmd_args(
-            "/bin/sh", "-c",
+            "/bin/sh",
+            "-c",
             cmd_args(
-                "OLEAN_DIR=", olean_dir.as_output(),
-                " C_DIR=", c_dir.as_output(),
-                " && ", script,
+                "OLEAN_DIR=",
+                olean_dir.as_output(),
+                " C_DIR=",
+                c_dir.as_output(),
+                " && ",
+                script,
                 delimiter = "",
             ),
             hidden = hidden,

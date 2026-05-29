@@ -16,39 +16,46 @@ import sys
 
 # Map Continuity rule union tags → Buck2 rule names
 RULE_MAP = {
-    "CxxBinary":         "cxx_binary",
-    "CxxLibrary":        "cxx_library",
-    "RustBinary":        "rust_binary",
-    "RustLibrary":       "rust_library",
-    "HaskellBinary":     "haskell_binary",
-    "HaskellLibrary":    "haskell_library",
-    "HaskellFFIBinary":  "haskell_binary",  # FFI handled via extra attrs
-    "LeanBinary":        "lean_binary",
-    "LeanLibrary":       "lean_library",
-    "NvBinary":          "cuda_binary",
-    "NvLibrary":         "cuda_library",
-    "PureScriptApp":     "purescript_app",
-    "PureScriptBinary":  "purescript_binary",
+    "CxxBinary": "cxx_binary",
+    "CxxLibrary": "cxx_library",
+    "RustBinary": "rust_binary",
+    "RustLibrary": "rust_library",
+    "HaskellBinary": "haskell_binary",
+    "HaskellLibrary": "haskell_library",
+    "HaskellFFIBinary": "haskell_binary",  # FFI handled via extra attrs
+    "LeanBinary": "lean_binary",
+    "LeanLibrary": "lean_library",
+    "NvBinary": "cuda_binary",
+    "NvLibrary": "cuda_library",
+    "PureScriptApp": "purescript_app",
+    "PureScriptBinary": "purescript_binary",
     "PureScriptLibrary": "purescript_library",
-    "Genrule":           "genrule",
-    "NixCxxBinary":      "nix_cxx_binary",
-    "CratesIo":          "crates_io",
-    "HttpArchive":       "http_archive",
+    "Genrule": "genrule",
+    "NixCxxBinary": "nix_cxx_binary",
+    "CratesIo": "crates_io",
+    "HttpArchive": "http_archive",
 }
 
 # Map Continuity CxxStd → Buck2 string
 CXX_STD_MAP = {
-    "Cxx11": "c++11", "Cxx14": "c++14", "Cxx17": "c++17",
-    "Cxx20": "c++20", "Cxx23": "c++23",
+    "Cxx11": "c++11",
+    "Cxx14": "c++14",
+    "Cxx17": "c++17",
+    "Cxx20": "c++20",
+    "Cxx23": "c++23",
 }
 
 # Map Continuity Edition → Rust edition
 EDITION_MAP = {
-    "E2015": "2015", "E2018": "2018", "E2021": "2021", "E2024": "2024",
+    "E2015": "2015",
+    "E2018": "2018",
+    "E2021": "2021",
+    "E2024": "2024",
 }
 
 # Map Continuity Vis → Buck2 visibility
 VIS_MAP = {"Public": ["PUBLIC"], "Private": []}
+
 
 def render_dep(dep):
     """Convert a Continuity Dep to a Buck2 dependency string."""
@@ -66,6 +73,7 @@ def render_dep(dep):
             elif tag == "External":
                 return f"//external:{val['name']}"
     return str(dep)
+
 
 def render_value(val, indent=8):
     """Render a Python value as Starlark."""
@@ -87,10 +95,11 @@ def render_value(val, indent=8):
         return "None"
     return str(val)
 
+
 def render_rule(tag, fields):
     """Render one Buck2 rule from a Continuity rule."""
     buck2_rule = RULE_MAP.get(tag, tag.lower())
-    lines = [f'{buck2_rule}(']
+    lines = [f"{buck2_rule}("]
 
     for key, val in fields.items():
         # Skip internal fields
@@ -114,10 +123,11 @@ def render_rule(tag, fields):
                 key = "visibility"
                 break
 
-        lines.append(f'    {key} = {render_value(val)},')
+        lines.append(f"    {key} = {render_value(val)},")
 
-    lines.append(')')
+    lines.append(")")
     return "\n".join(lines)
+
 
 def main():
     if len(sys.argv) < 2:
@@ -131,8 +141,10 @@ def main():
         result = subprocess.run(
             ["dhall-to-json"],
             input=f"./{dhall_file}",
-            capture_output=True, text=True, check=True,
-            cwd="." if "/" not in dhall_file else None
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd="." if "/" not in dhall_file else None,
         )
     except subprocess.CalledProcessError as e:
         print(f"dhall-to-json failed:\n{e.stderr}", file=sys.stderr)
@@ -166,6 +178,7 @@ def main():
                         print(render_rule(tag, fields))
                         print()
                         break
+
 
 if __name__ == "__main__":
     main()

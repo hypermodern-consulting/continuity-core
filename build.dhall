@@ -1,6 +1,9 @@
 let C = ./.continuity-prelude/package.dhall
+
 let R = ./.continuity-prelude/render/buck2/package.dhall
+
 let Lean = ./.continuity-prelude/render/buck2/toolchains/lean.dhall
+
 let Exec = ./.continuity-prelude/render/buck2/toolchains/execution.dhall
 
 let lib =
@@ -47,9 +50,9 @@ let exe =
         [ C.dep.local ":continuity-lib" ]
 
 in  { buck =
-          R.renderRule (C.rule.leanLibrary lib)
-        ++ "\n"
-        ++ R.renderRule (C.rule.leanBinary exe)
+            R.renderRule (C.rule.leanLibrary lib)
+        ++  "\n"
+        ++  R.renderRule (C.rule.leanBinary exe)
     , toolchain_bzl = Lean.render
     , execution_bzl = Exec.render
     }

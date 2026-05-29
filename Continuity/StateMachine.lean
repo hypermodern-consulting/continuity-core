@@ -1,10 +1,7 @@
-
-
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                          // continuity // statemachine
-                                                                                                                           statemachine.lean
+                                              // continuity // state // machine
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-!
@@ -22,9 +19,9 @@ set_option autoImplicit false
 namespace Continuity.StateMachine
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                       // core
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════
+                                                                        // core
+   ════════════════════════════════════════════════════════════════════════════ -/
 
 structure Transition (S A : Type) where
   next : S
@@ -50,9 +47,9 @@ def Machine.validTrace {S E A : Type} (m : Machine S E A) (events : List E) : Bo
   m.isTerminal (m.run events).1
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                               // combinators
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════
+                                                                 // combinators
+   ════════════════════════════════════════════════════════════════════════════ -/
 
 inductive Either (α β : Type) where
   | left : α → Either α β
@@ -63,7 +60,9 @@ inductive Either (α β : Type) where
 def Machine.product {S₁ S₂ E₁ E₂ A₁ A₂ : Type}
     (m₁ : Machine S₁ E₁ A₁) (m₂ : Machine S₂ E₂ A₂)
     : Machine (S₁ × S₂) (Either E₁ E₂) (Either A₁ A₂) where
+    
   initial := (m₁.initial, m₂.initial)
+  
   transition := fun (s₁, s₂) e =>
     match e with
     | .left e₁ =>
@@ -72,6 +71,7 @@ def Machine.product {S₁ S₂ E₁ E₂ A₁ A₂ : Type}
     | .right e₂ =>
       let t := m₂.transition s₂ e₂
       { next := (s₁, t.next), actions := t.actions.map .right }
+      
   isTerminal := fun (s₁, s₂) => m₁.isTerminal s₁ && m₂.isTerminal s₂
 
 /-- Sum: choose between two machines based on initial event. -/
@@ -84,7 +84,9 @@ inductive SumState (S₁ S₂ : Type) where
 def Machine.sum {S₁ S₂ E₁ E₂ A₁ A₂ : Type}
     (m₁ : Machine S₁ E₁ A₁) (m₂ : Machine S₂ E₂ A₂)
     : Machine (SumState S₁ S₂) (Either E₁ E₂) (Either A₁ A₂) where
+    
   initial := .uninit
+  
   transition := fun s e =>
     match s, e with
     | .uninit, .left e₁ =>
@@ -101,6 +103,7 @@ def Machine.sum {S₁ S₂ E₁ E₂ A₁ A₂ : Type}
       { next := .inRight t.next, actions := t.actions.map .right }
     | .inLeft s₁, .right _ => { next := .inLeft s₁, actions := [] }
     | .inRight s₂, .left _ => { next := .inRight s₂, actions := [] }
+    
   isTerminal := fun s =>
     match s with
     | .uninit => false
@@ -144,31 +147,37 @@ def Machine.sequential {S₁ S₂ E₁ E₂ A₁ A₂ : Type}
 /-- MapActions: transform actions without changing state or events. -/
 def Machine.mapActions {S E A A' : Type} (m : Machine S E A) (f : A → A') : Machine S E A' where
   initial := m.initial
+  
   transition := fun s e =>
     let t := m.transition s e
     { next := t.next, actions := t.actions.map f }
+    
   isTerminal := m.isTerminal
 
 /-- ExtendState: attach metadata that doesn't affect transitions. -/
 def Machine.extendState {S E A X : Type} (m : Machine S E A) (init : X) : Machine (S × X) E A where
   initial := (m.initial, init)
+  
   transition := fun (s, x) e =>
     let t := m.transition s e
     { next := (t.next, x), actions := t.actions }
+    
   isTerminal := fun (s, _) => m.isTerminal s
 
 /-- WithState: modify extended state based on transitions. -/
 def Machine.withState {S E A X : Type} (m : Machine S E A) (init : X) (update : S → E → X → X)
     : Machine (S × X) E A where
   initial := (m.initial, init)
+  
   transition := fun (s, x) e =>
     let t := m.transition s e
     { next := (t.next, update s e x), actions := t.actions }
+    
   isTerminal := fun (s, _) => m.isTerminal s
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
-                                                        // combinator proofs
+                                                            // combinator // proofs
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 theorem product_left_preserves_right {S₁ S₂ E₁ E₂ A₁ A₂ : Type}
@@ -200,22 +209,26 @@ theorem mapActions_preserves_next {S E A A' : Type}
   simp [Machine.mapActions]
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                   // protocol version
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════
+                                                         // protocol // version
+   ════════════════════════════════════════════════════════════════════════════ -/
 
 structure ProtocolVersion where
   value : UInt64
   deriving Repr, DecidableEq
 
 namespace ProtocolVersion
+
   def make (major minor : Nat) : ProtocolVersion :=
     ⟨((major.toUInt64 <<< 8) ||| minor.toUInt64)⟩
+    
   def major (v : ProtocolVersion) : Nat := (v.value >>> 8).toNat
   def minor (v : ProtocolVersion) : Nat := (v.value &&& 0xFF).toNat
+  
   def supports (v : ProtocolVersion) (minMinor : Nat) : Bool := v.minor >= minMinor
   def current : ProtocolVersion := make 1 38
   def minimum : ProtocolVersion := make 1 10
+  
 end ProtocolVersion
 
 inductive Feature where
@@ -249,7 +262,7 @@ def HandshakeConfig.default : HandshakeConfig := {
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
-                                                    // server handshake
+                                                             // server // handshake
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 inductive ServerState where
@@ -343,7 +356,7 @@ def serverHandshake (config : HandshakeConfig) : Machine ServerState ServerEvent
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
-                                                    // client handshake
+                                                             // client // handshake
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 inductive ClientState where
@@ -415,7 +428,7 @@ def clientHandshake (clientVersion : ProtocolVersion) (features : List Feature)
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
-                                                    // daemon operation loop
+                                                        // daemon // operation loop
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 inductive DaemonOpState where
@@ -474,7 +487,7 @@ def daemonOps (version : ProtocolVersion) : Machine DaemonOpState DaemonOpEvent 
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
-                                                    // composed daemon
+                                                              // composed // daemon
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 abbrev DaemonEvent := SeqEvent ServerEvent DaemonOpEvent
@@ -486,14 +499,16 @@ def daemonMachine (config : HandshakeConfig)
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
-                                                              // proofs
+                                                                          // proofs
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 theorem server_terminal_stays_terminal (config : HandshakeConfig)
     (s : ServerState) (e : ServerEvent) :
     (serverHandshake config).isTerminal s = true →
     (serverHandshake config).isTerminal ((serverHandshake config).transition s e).next = true := by
+    
   intro h; simp [serverHandshake] at h ⊢
+  
   match s with
   | .nixReady _ => simp [serverTransition]
   | .reapiReady _ => simp [serverTransition]
@@ -502,7 +517,7 @@ theorem server_terminal_stays_terminal (config : HandshakeConfig)
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
-                                                           // test traces
+                                                                  // test // traces
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def exampleReapiHandshake : List ServerEvent :=

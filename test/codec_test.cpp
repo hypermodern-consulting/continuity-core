@@ -1,11 +1,12 @@
 // codec_test.cpp — roundtrip property tests for all generated codecs
 // Compile: g++-13 -std=c++20 -O2 -I test -o test/codec_test test/codec_test.cpp
-#include "codec_runtime.hpp"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <random>
+
+#include "codec_runtime.hpp"
 
 using namespace continuity;
 
@@ -15,16 +16,27 @@ using namespace continuity;
 
 static std::mt19937_64 rng(42);
 
-uint8_t  rand_u8()  { return std::uniform_int_distribution<uint16_t>(0, 255)(rng); }
-uint16_t rand_u16() { return std::uniform_int_distribution<uint16_t>()(rng); }
-uint32_t rand_u32() { return std::uniform_int_distribution<uint32_t>()(rng); }
-uint64_t rand_u64() { return std::uniform_int_distribution<uint64_t>()(rng); }
-bool     rand_bool(){ return rng() & 1; }
+uint8_t rand_u8() {
+  return std::uniform_int_distribution<uint16_t>(0, 255)(rng);
+}
+uint16_t rand_u16() {
+  return std::uniform_int_distribution<uint16_t>()(rng);
+}
+uint32_t rand_u32() {
+  return std::uniform_int_distribution<uint32_t>()(rng);
+}
+uint64_t rand_u64() {
+  return std::uniform_int_distribution<uint64_t>()(rng);
+}
+bool rand_bool() {
+  return rng() & 1;
+}
 
 std::vector<uint8_t> rand_bytes(size_t maxlen = 256) {
   size_t n = rng() % (maxlen + 1);
   std::vector<uint8_t> v(n);
-  for (auto& b : v) b = rand_u8();
+  for (auto& b : v)
+    b = rand_u8();
   return v;
 }
 
@@ -34,10 +46,15 @@ std::vector<uint8_t> rand_bytes(size_t maxlen = 256) {
 
 static int pass = 0, fail = 0;
 
-#define CHECK(cond, msg) do { \
-  if (!(cond)) { fprintf(stderr, "FAIL: %s\n", msg); fail++; } \
-  else { pass++; } \
-} while(0)
+#define CHECK(cond, msg)                                                                           \
+  do {                                                                                             \
+    if (!(cond)) {                                                                                 \
+      fprintf(stderr, "FAIL: %s\n", msg);                                                          \
+      fail++;                                                                                      \
+    } else {                                                                                       \
+      pass++;                                                                                      \
+    }                                                                                              \
+  } while (0)
 
 void test_u8_roundtrip() {
   for (int i = 0; i < 1000; i++) {
@@ -100,8 +117,8 @@ void test_bool64_roundtrip() {
 
 void test_varint_roundtrip() {
   // Specific edge cases
-  uint64_t edges[] = {0, 1, 127, 128, 16383, 16384, 2097151, 2097152,
-                      268435455, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFFULL};
+  uint64_t edges[] = {
+      0, 1, 127, 128, 16383, 16384, 2097151, 2097152, 268435455, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFFULL};
   for (auto v : edges) {
     std::vector<uint8_t> buf;
     write_varint(buf, v);
@@ -139,7 +156,8 @@ void test_fixed_bytes_roundtrip() {
     // Test 20-byte (SHA-1) and 32-byte (SHA-256) fixed arrays
     for (size_t n : {4, 20, 32}) {
       std::vector<uint8_t> v(n);
-      for (auto& b : v) b = rand_u8();
+      for (auto& b : v)
+        b = rand_u8();
       std::vector<uint8_t> buf;
       write_bytes(buf, v);
       ParseState ps{buf.data(), buf.size()};
@@ -189,15 +207,23 @@ void test_attest_calldata_roundtrip() {
   for (int i = 0; i < 100; i++) {
     std::vector<uint8_t> sel(4), ch(32), si(32), ia(32), ea(32), vcr(32);
     for (auto* v : {&sel, &ch, &si, &ia, &ea, &vcr})
-      for (auto& b : *v) b = rand_u8();
+      for (auto& b : *v)
+        b = rand_u8();
     std::vector<uint8_t> buf;
-    write_bytes(buf, sel); write_bytes(buf, ch); write_bytes(buf, si);
-    write_bytes(buf, ia);  write_bytes(buf, ea); write_bytes(buf, vcr);
+    write_bytes(buf, sel);
+    write_bytes(buf, ch);
+    write_bytes(buf, si);
+    write_bytes(buf, ia);
+    write_bytes(buf, ea);
+    write_bytes(buf, vcr);
     CHECK(buf.size() == 164, "AttestCalldata size");
     ParseState ps{buf.data(), buf.size()};
-    auto r_sel = read_bytes(ps, 4);  auto r_ch = read_bytes(ps, 32);
-    auto r_si  = read_bytes(ps, 32); auto r_ia = read_bytes(ps, 32);
-    auto r_ea  = read_bytes(ps, 32); auto r_vcr = read_bytes(ps, 32);
+    auto r_sel = read_bytes(ps, 4);
+    auto r_ch = read_bytes(ps, 32);
+    auto r_si = read_bytes(ps, 32);
+    auto r_ia = read_bytes(ps, 32);
+    auto r_ea = read_bytes(ps, 32);
+    auto r_vcr = read_bytes(ps, 32);
     CHECK(r_sel && r_ch && r_si && r_ia && r_ea && r_vcr, "AttestCalldata parse");
     CHECK(*r_sel == sel && *r_ch == ch && *r_si == si, "AttestCalldata fields 1-3");
     CHECK(*r_ia == ia && *r_ea == ea && *r_vcr == vcr, "AttestCalldata fields 4-6");
@@ -229,15 +255,24 @@ void fuzz_parsers() {
 
     // These should all either return a value or nullopt, never crash
     read_u8(ps);
-    ps.pos = 0; read_u16le(ps);
-    ps.pos = 0; read_u32le(ps);
-    ps.pos = 0; read_u64le(ps);
-    ps.pos = 0; read_u32be(ps);
-    ps.pos = 0; read_u64be(ps);
-    ps.pos = 0; read_bool64(ps);
-    ps.pos = 0; read_varint(ps);
-    ps.pos = 0; read_len_prefixed(ps);
-    ps.pos = 0; read_bytes(ps, 20);
+    ps.pos = 0;
+    read_u16le(ps);
+    ps.pos = 0;
+    read_u32le(ps);
+    ps.pos = 0;
+    read_u64le(ps);
+    ps.pos = 0;
+    read_u32be(ps);
+    ps.pos = 0;
+    read_u64be(ps);
+    ps.pos = 0;
+    read_bool64(ps);
+    ps.pos = 0;
+    read_varint(ps);
+    ps.pos = 0;
+    read_len_prefixed(ps);
+    ps.pos = 0;
+    read_bytes(ps, 20);
   }
   pass += 100000;
 }

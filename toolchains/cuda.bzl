@@ -54,7 +54,8 @@ def _cuda_library_impl(ctx: AnalysisContext) -> list[Provider]:
 
     ctx.actions.run(
         cmd_args(
-            "/bin/sh", "-c",
+            "/bin/sh",
+            "-c",
             cmd_args("OBJ_DIR=", obj_dir.as_output(), " && ", script, delimiter = ""),
             hidden = list(ctx.attrs.srcs),
         ),
@@ -126,7 +127,8 @@ def _cuda_binary_impl(ctx: AnalysisContext) -> list[Provider]:
 
     ctx.actions.run(
         cmd_args(
-            "/bin/sh", "-c",
+            "/bin/sh",
+            "-c",
             cmd_args("OBJ_DIR=", obj_dir.as_output(), " && ", script, delimiter = ""),
             hidden = hidden,
         ),

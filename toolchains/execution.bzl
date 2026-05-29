@@ -1,13 +1,6 @@
 # Generated from Dhall - DO NOT EDIT
 # Execution platforms for Buck2 remote execution (LRE).
 
-
-
-
-
-
-
-
 def _host_cpu_configuration():
     arch = host_info().arch
     if arch.is_aarch64:
@@ -19,7 +12,6 @@ def _host_cpu_configuration():
     else:
         return "prelude//cpu:x86_64"
 
-
 def _host_os_configuration():
     os = host_info().os
     if os.is_macos:
@@ -28,8 +20,6 @@ def _host_os_configuration():
         return "prelude//os:windows"
     else:
         return "prelude//os:linux"
-
-
 
 def _lre_execution_platform_impl(ctx: AnalysisContext) -> list[Provider]:
     """Execution platform with remote execution enabled."""
@@ -72,7 +62,6 @@ def _lre_execution_platform_impl(ctx: AnalysisContext) -> list[Provider]:
         PlatformInfo(label = str(name), configuration = cfg),
         ExecutionPlatformRegistrationInfo(platforms = [platform]),
     ]
-
 
 lre_execution_platform = rule(
     impl = _lre_execution_platform_impl,
