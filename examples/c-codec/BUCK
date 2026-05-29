@@ -1,0 +1,6 @@
+genrule(
+    name = "varint-test",
+    srcs = ["main.c", "varint.h"],
+    out = "varint-test",
+    bash = "SRCDIR=`dirname $SRCS | head -1` && gcc -O2 -o $OUT $SRCDIR/main.c -I$SRCDIR",
+)
