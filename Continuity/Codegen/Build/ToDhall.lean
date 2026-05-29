@@ -131,17 +131,13 @@ def gpuNames    : List String := gpuTable.map Prod.fst
 
 /-- Emit a Dhall triple record value from a Lean Triple. -/
 def emitTriple (t : Continuity.Build.Triple) : Expr :=
-  let archStr := t.arch.render
-  let vendorStr := t.vendor.render
-  let osStr := t.os.render
-  let cpuStr := t.cpu.render
   buildRecord do
-    field "arch"   <| Expr.enumVal "Arch" archNames archStr
-    field "vendor" <| Expr.enumVal "Vendor" vendorNames vendorStr
-    field "os"     <| Expr.enumVal "OS" osNames osStr
-    field "abi"    <| Expr.enumVal "ABI" abiNames t.abi.render
-    field "cpu"    <| Expr.enumVal "Cpu" cpuNames cpuStr
-    field "gpu"    <| Expr.enumVal "Gpu" gpuNames t.gpu.render
+    field "arch"   <| Expr.enumVal "Arch" archNames t.arch.name
+    field "vendor" <| Expr.enumVal "Vendor" vendorNames t.vendor.name
+    field "os"     <| Expr.enumVal "OS" osNames t.os.name
+    field "abi"    <| Expr.enumVal "ABI" abiNames t.abi.name
+    field "cpu"    <| Expr.enumVal "Cpu" cpuNames t.cpu.name
+    field "gpu"    <| Expr.enumVal "Gpu" gpuNames t.gpu.name
 
 /-- Emit a named triple binding: `let name : Triple = { ... }` -/
 def emitNamedTriple (name : String) (t : Continuity.Build.Triple) : String × Option Expr × Expr :=
@@ -204,7 +200,6 @@ def emitTripleDhall : Expr :=
     field "Gpu"     (Expr.var "Gpu")
     field "Triple"  (Expr.var "Triple")
     -- render functions
-    field "render"       (Expr.var "render")
     field "renderArch"   (Expr.var "renderArch")
     field "renderVendor" (Expr.var "renderVendor")
     field "renderOS"     (Expr.var "renderOS")
@@ -382,8 +377,8 @@ def emitCxxDhall : Expr :=
 
   let cxxStd := ("CxxStd", Option.some (Expr.ty "Type"), emitEnum cxxStdNames)
 
-  let depRef := Expr.importFile "core/Dep.dhall"
-  let visRef := Expr.importFile "core/Vis.dhall"
+  let depRef := Expr.importParentFile "core/Dep.dhall"
+  let visRef := Expr.importParentFile "core/Vis.dhall"
   let d := ("D", Option.none, depRef)
   let v := ("V", Option.none, visRef)
 
@@ -505,8 +500,8 @@ private def visDflt : Expr := Expr.field (Expr.var "V") "public"
 private def emptyTextList : Expr := Expr.emptyList (Expr.ty "Text")
 
 def emitHaskellDhall : Expr :=
-  let d := ("D", Option.none, Expr.importFile "core/Dep.dhall")
-  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let d := ("D", Option.none, Expr.importParentFile "core/Dep.dhall")
+  let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
   let binaryType := ("Binary", Option.none, buildRecordType do
     field "name"     (Expr.ty "Text")
     field "srcs"     textListTy
@@ -558,8 +553,8 @@ def emitHaskellDhall : Expr :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def emitRustDhall : Expr :=
-  let d := ("D", Option.none, Expr.importFile "core/Dep.dhall")
-  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let d := ("D", Option.none, Expr.importParentFile "core/Dep.dhall")
+  let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
   let editionNames := ["E2015", "E2018", "E2021", "E2024"]
   let edition := ("Edition", Option.some (Expr.ty "Type"), emitEnum editionNames)
   let ed2021 := Expr.enumVal "Edition" editionNames "E2021"
@@ -625,7 +620,7 @@ def emitRustDhall : Expr :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def emitGenruleDhall : Expr :=
-  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
   let genruleType := ("Genrule", Option.none, buildRecordType do
     field "name" (Expr.ty "Text")
     field "out"  (Expr.ty "Text")
@@ -660,8 +655,8 @@ def emitGenruleDhall : Expr :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def emitLeanDhall : Expr :=
-  let d := ("D", Option.none, Expr.importFile "core/Dep.dhall")
-  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let d := ("D", Option.none, Expr.importParentFile "core/Dep.dhall")
+  let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
   let binaryType := ("Binary", Option.none, buildRecordType do
     field "name"      (Expr.ty "Text")
     field "srcs"      textListTy
@@ -711,8 +706,8 @@ def emitLeanDhall : Expr :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def emitNvDhall : Expr :=
-  let d := ("D", Option.none, Expr.importFile "core/Dep.dhall")
-  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let d := ("D", Option.none, Expr.importParentFile "core/Dep.dhall")
+  let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
   let binaryType := ("Binary", Option.none, buildRecordType do
     field "name"  (Expr.ty "Text")
     field "srcs"  textListTy
@@ -758,7 +753,7 @@ def emitNvDhall : Expr :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def emitPureScriptDhall : Expr :=
-  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
   let srcSpecNames := ["Explicit", "Glob", "Globs"]
   let srcSpec := ("SrcSpec", Option.some (Expr.ty "Type"),
     Expr.unionType [
@@ -833,7 +828,7 @@ def emitPureScriptDhall : Expr :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def emitNixCxxDhall : Expr :=
-  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
   let nixBinaryType := ("NixBinary", Option.none, buildRecordType do
     field "name"           (Expr.ty "Text")
     field "srcs"           textListTy
@@ -865,7 +860,7 @@ def emitNixCxxDhall : Expr :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def emitRustCrateDhall : Expr :=
-  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
   let cratesIoType := ("CratesIo", Option.none, buildRecordType do
     field "name"       (Expr.ty "Text")
     field "version"    (Expr.ty "Text")
@@ -915,15 +910,15 @@ def emitRustCrateDhall : Expr :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def emitRuleDhall : Expr :=
-  let c  := ("C",  Option.none, Expr.importFile "lang/Cxx.dhall")
-  let r  := ("R",  Option.none, Expr.importFile "lang/Rust.dhall")
-  let h  := ("H",  Option.none, Expr.importFile "lang/Haskell.dhall")
-  let l  := ("L",  Option.none, Expr.importFile "lang/Lean.dhall")
-  let n  := ("N",  Option.none, Expr.importFile "lang/Nv.dhall")
-  let ps := ("PS", Option.none, Expr.importFile "lang/PureScript.dhall")
-  let g  := ("G",  Option.none, Expr.importFile "lang/Genrule.dhall")
-  let nc := ("NC", Option.none, Expr.importFile "lang/NixCxx.dhall")
-  let rc := ("RC", Option.none, Expr.importFile "lang/RustCrate.dhall")
+  let c  := ("C",  Option.none, Expr.importParentFile "lang/Cxx.dhall")
+  let r  := ("R",  Option.none, Expr.importParentFile "lang/Rust.dhall")
+  let h  := ("H",  Option.none, Expr.importParentFile "lang/Haskell.dhall")
+  let l  := ("L",  Option.none, Expr.importParentFile "lang/Lean.dhall")
+  let n  := ("N",  Option.none, Expr.importParentFile "lang/Nv.dhall")
+  let ps := ("PS", Option.none, Expr.importParentFile "lang/PureScript.dhall")
+  let g  := ("G",  Option.none, Expr.importParentFile "lang/Genrule.dhall")
+  let nc := ("NC", Option.none, Expr.importParentFile "lang/NixCxx.dhall")
+  let rc := ("RC", Option.none, Expr.importParentFile "lang/RustCrate.dhall")
 
   let ruleType := ("Rule", Option.none, Expr.unionType [
     ("CxxBinary",         Option.some (Expr.field (Expr.var "C") "Binary")),

@@ -163,4 +163,38 @@ def Triple.dgx_blackwell : Triple :=
 #guard Triple.grace_hopper.cpu.render == "neoverse-v2"
 
 
+
+-- constructor names for codegen (match Dhall union tags)
+def Arch.name : Arch → String
+  | .x86_64 => "x86_64" | .aarch64 => "aarch64"
+  | .riscv64 => "riscv64" | .wasm32 => "wasm32" | .armv7 => "armv7"
+
+def Vendor.name : Vendor → String
+  | .unknown => "unknown" | .pc => "pc"
+  | .apple => "apple" | .nvidia => "nvidia"
+
+def OS.name : OS → String
+  | .linux => "linux" | .darwin => "darwin"
+  | .windows => "windows" | .wasi => "wasi" | .none => "none"
+
+def ABI.name : ABI → String
+  | .gnu => "gnu" | .musl => "musl" | .eabi => "eabi"
+  | .eabihf => "eabihf" | .msvc => "msvc" | .none => "none"
+
+def Cpu.name : Cpu → String
+  | .generic => "generic" | .native => "native"
+  | .x86_64_v2 => "x86_64_v2" | .x86_64_v3 => "x86_64_v3" | .x86_64_v4 => "x86_64_v4"
+  | .znver3 => "znver3" | .znver4 => "znver4" | .znver5 => "znver5"
+  | .sapphirerapids => "sapphirerapids" | .alderlake => "alderlake"
+  | .neoverse_v2 => "neoverse_v2" | .neoverse_n2 => "neoverse_n2"
+  | .cortex_a78ae => "cortex_a78ae" | .cortex_a78c => "cortex_a78c"
+  | .apple_m1 => "apple_m1" | .apple_m2 => "apple_m2"
+  | .apple_m3 => "apple_m3" | .apple_m4 => "apple_m4"
+
+def Gpu.name : Gpu → String
+  | .none => "none" | .sm_80 => "sm_80" | .sm_86 => "sm_86"
+  | .sm_87 => "sm_87" | .sm_89 => "sm_89" | .sm_90 => "sm_90"
+  | .sm_90a => "sm_90a" | .sm_100 => "sm_100"
+  | .sm_100a => "sm_100a" | .sm_120 => "sm_120"
+
 end Continuity.Build

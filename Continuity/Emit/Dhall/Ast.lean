@@ -268,6 +268,9 @@ def textConcat (lhs : Expr) (rhs : Expr) : Expr :=
 def importFile (path : String) : Expr :=
   Expr.import_ (Import.file path) ImportMode.code Option.none
 
+def importParentFile (path : String) : Expr :=
+  Expr.import_ (Import.parentFile path) ImportMode.code Option.none
+
 def importFileAsText (path : String) : Expr :=
   Expr.import_ (Import.file path) ImportMode.asText Option.none
 
