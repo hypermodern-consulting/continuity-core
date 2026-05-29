@@ -652,6 +652,368 @@ def emitGenruleDhall : Expr :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 /-- All prelude modules and their output paths. -/
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                      // Lean.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitLeanDhall : Expr :=
+  let d := ("D", Option.none, Expr.importFile "core/Dep.dhall")
+  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let binaryType := ("Binary", Option.none, buildRecordType do
+    field "name"      (Expr.ty "Text")
+    field "srcs"      textListTy
+    field "deps"      depListTy
+    field "root"      (Expr.ty "Text")
+    field "leanFlags" textListTy
+    field "vis"       visTy)
+  let binaryFn := ("binary", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (Expr.lambda "deps" depListTy
+          (buildRecord do
+            field "name"      (Expr.var "name")
+            field "srcs"      (Expr.var "srcs")
+            field "deps"      (Expr.var "deps")
+            field "root"      (Expr.str "Main.lean")
+            field "leanFlags" emptyTextList
+            field "vis"       visDflt))))
+  let libraryType := ("Library", Option.none, buildRecordType do
+    field "name"      (Expr.ty "Text")
+    field "srcs"      textListTy
+    field "deps"      depListTy
+    field "root"      (Expr.ty "Text")
+    field "leanFlags" textListTy
+    field "vis"       visTy)
+  let libraryFn := ("library", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (Expr.lambda "deps" depListTy
+          (buildRecord do
+            field "name"      (Expr.var "name")
+            field "srcs"      (Expr.var "srcs")
+            field "deps"      (Expr.var "deps")
+            field "root"      (Expr.str "lib.lean")
+            field "leanFlags" emptyTextList
+            field "vis"       visDflt))))
+  let exports := buildRecord do
+    field "Binary"  (Expr.var "Binary")
+    field "binary"  (Expr.var "binary")
+    field "Library" (Expr.var "Library")
+    field "library" (Expr.var "library")
+  Expr.letChain [d, v, binaryType, binaryFn, libraryType, libraryFn] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                        // Nv.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitNvDhall : Expr :=
+  let d := ("D", Option.none, Expr.importFile "core/Dep.dhall")
+  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let binaryType := ("Binary", Option.none, buildRecordType do
+    field "name"  (Expr.ty "Text")
+    field "srcs"  textListTy
+    field "deps"  depListTy
+    field "archs" textListTy
+    field "vis"   visTy)
+  let binaryFn := ("binary", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (buildRecord do
+          field "name"  (Expr.var "name")
+          field "srcs"  (Expr.var "srcs")
+          field "deps"  (Expr.emptyList depListTy)
+          field "archs" emptyTextList
+          field "vis"   visDflt)))
+  let libraryType := ("Library", Option.none, buildRecordType do
+    field "name"             (Expr.ty "Text")
+    field "srcs"             textListTy
+    field "exported_headers" textListTy
+    field "deps"             depListTy
+    field "archs"            textListTy
+    field "vis"              visTy)
+  let libraryFn := ("library", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (buildRecord do
+          field "name"             (Expr.var "name")
+          field "srcs"             (Expr.var "srcs")
+          field "exported_headers" emptyTextList
+          field "deps"             (Expr.emptyList depListTy)
+          field "archs"            emptyTextList
+          field "vis"              visDflt)))
+  let exports := buildRecord do
+    field "Binary"  (Expr.var "Binary")
+    field "binary"  (Expr.var "binary")
+    field "Library" (Expr.var "Library")
+    field "library" (Expr.var "library")
+  Expr.letChain [d, v, binaryType, binaryFn, libraryType, libraryFn] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                  // PureScript.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitPureScriptDhall : Expr :=
+  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let srcSpecNames := ["Explicit", "Glob", "Globs"]
+  let srcSpec := ("SrcSpec", Option.some (Expr.ty "Type"),
+    Expr.unionType [
+      ("Explicit", Option.some textListTy),
+      ("Glob",     Option.some (Expr.ty "Text")),
+      ("Globs",    Option.some textListTy)
+    ])
+  let appType := ("App", Option.none, buildRecordType do
+    field "name"       (Expr.ty "Text")
+    field "srcs"       (Expr.var "SrcSpec")
+    field "spago_yaml" (Expr.ty "Text")
+    field "spago_lock" (Expr.optionalOf (Expr.ty "Text"))
+    field "main"       (Expr.ty "Text")
+    field "index_html" (Expr.optionalOf (Expr.ty "Text"))
+    field "style_css"  (Expr.optionalOf (Expr.ty "Text"))
+    field "vis"        visTy)
+  let appFn := ("app", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" (Expr.var "SrcSpec")
+        (Expr.lambda "spago_yaml" (Expr.ty "Text")
+          (buildRecord do
+            field "name"       (Expr.var "name")
+            field "srcs"       (Expr.var "srcs")
+            field "spago_yaml" (Expr.var "spago_yaml")
+            field "spago_lock" (Expr.none (Expr.ty "Text"))
+            field "main"       (Expr.str "Main")
+            field "index_html" (Expr.some (Expr.str "index.html"))
+            field "style_css"  (Expr.some (Expr.str "style.css"))
+            field "vis"        visDflt))))
+  let binaryType := ("Binary", Option.none, buildRecordType do
+    field "name"       (Expr.ty "Text")
+    field "srcs"       (Expr.var "SrcSpec")
+    field "spago_yaml" (Expr.ty "Text")
+    field "main"       (Expr.ty "Text")
+    field "vis"        visTy)
+  let binaryFn := ("binary", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" (Expr.var "SrcSpec")
+        (Expr.lambda "spago_yaml" (Expr.ty "Text")
+          (buildRecord do
+            field "name"       (Expr.var "name")
+            field "srcs"       (Expr.var "srcs")
+            field "spago_yaml" (Expr.var "spago_yaml")
+            field "main"       (Expr.str "Main")
+            field "vis"        visDflt))))
+  let libraryType := ("Library", Option.none, buildRecordType do
+    field "name"       (Expr.ty "Text")
+    field "srcs"       (Expr.var "SrcSpec")
+    field "spago_yaml" (Expr.optionalOf (Expr.ty "Text"))
+    field "vis"        visTy)
+  let libraryFn := ("library", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" (Expr.var "SrcSpec")
+        (buildRecord do
+          field "name"       (Expr.var "name")
+          field "srcs"       (Expr.var "srcs")
+          field "spago_yaml" (Expr.none (Expr.ty "Text"))
+          field "vis"        visDflt)))
+  let exports := buildRecord do
+    field "App"     (Expr.var "App")
+    field "app"     (Expr.var "app")
+    field "Binary"  (Expr.var "Binary")
+    field "binary"  (Expr.var "binary")
+    field "Library" (Expr.var "Library")
+    field "library" (Expr.var "library")
+    field "SrcSpec" (Expr.var "SrcSpec")
+  Expr.letChain [v, srcSpec, appType, appFn, binaryType, binaryFn, libraryType, libraryFn] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                     // NixCxx.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitNixCxxDhall : Expr :=
+  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let nixBinaryType := ("NixBinary", Option.none, buildRecordType do
+    field "name"           (Expr.ty "Text")
+    field "srcs"           textListTy
+    field "nix_deps"       textListTy
+    field "deps"           textListTy
+    field "compiler_flags" textListTy
+    field "linker_flags"   textListTy
+    field "vis"            visTy)
+  let nixBinaryFn := ("nixBinary", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (Expr.lambda "nix_deps" textListTy
+          (buildRecord do
+            field "name"           (Expr.var "name")
+            field "srcs"           (Expr.var "srcs")
+            field "nix_deps"       (Expr.var "nix_deps")
+            field "deps"           emptyTextList
+            field "compiler_flags" emptyTextList
+            field "linker_flags"   emptyTextList
+            field "vis"            visDflt))))
+  let exports := buildRecord do
+    field "NixBinary" (Expr.var "NixBinary")
+    field "nixBinary" (Expr.var "nixBinary")
+  Expr.letChain [v, nixBinaryType, nixBinaryFn] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                  // RustCrate.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitRustCrateDhall : Expr :=
+  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let cratesIoType := ("CratesIo", Option.none, buildRecordType do
+    field "name"       (Expr.ty "Text")
+    field "version"    (Expr.ty "Text")
+    field "sha256"     (Expr.ty "Text")
+    field "features"   textListTy
+    field "deps"       textListTy
+    field "proc_macro" (Expr.ty "Bool")
+    field "vis"        visTy)
+  let cratesIoFn := ("cratesIo", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "version" (Expr.ty "Text")
+        (Expr.lambda "sha256" (Expr.ty "Text")
+          (buildRecord do
+            field "name"       (Expr.var "name")
+            field "version"    (Expr.var "version")
+            field "sha256"     (Expr.var "sha256")
+            field "features"   emptyTextList
+            field "deps"       emptyTextList
+            field "proc_macro" Expr.ff
+            field "vis"        visDflt))))
+  let httpArchiveType := ("HttpArchive", Option.none, buildRecordType do
+    field "name"         (Expr.ty "Text")
+    field "url"          (Expr.ty "Text")
+    field "sha256"       (Expr.ty "Text")
+    field "strip_prefix" (Expr.optionalOf (Expr.ty "Text"))
+    field "vis"          visTy)
+  let httpArchiveFn := ("httpArchive", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "url" (Expr.ty "Text")
+        (Expr.lambda "sha256" (Expr.ty "Text")
+          (buildRecord do
+            field "name"         (Expr.var "name")
+            field "url"          (Expr.var "url")
+            field "sha256"       (Expr.var "sha256")
+            field "strip_prefix" (Expr.none (Expr.ty "Text"))
+            field "vis"          visDflt))))
+  let exports := buildRecord do
+    field "CratesIo"    (Expr.var "CratesIo")
+    field "cratesIo"    (Expr.var "cratesIo")
+    field "HttpArchive" (Expr.var "HttpArchive")
+    field "httpArchive" (Expr.var "httpArchive")
+  Expr.letChain [v, cratesIoType, cratesIoFn, httpArchiveType, httpArchiveFn] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                      // Rule.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitRuleDhall : Expr :=
+  let c  := ("C",  Option.none, Expr.importFile "lang/Cxx.dhall")
+  let r  := ("R",  Option.none, Expr.importFile "lang/Rust.dhall")
+  let h  := ("H",  Option.none, Expr.importFile "lang/Haskell.dhall")
+  let l  := ("L",  Option.none, Expr.importFile "lang/Lean.dhall")
+  let n  := ("N",  Option.none, Expr.importFile "lang/Nv.dhall")
+  let ps := ("PS", Option.none, Expr.importFile "lang/PureScript.dhall")
+  let g  := ("G",  Option.none, Expr.importFile "lang/Genrule.dhall")
+  let nc := ("NC", Option.none, Expr.importFile "lang/NixCxx.dhall")
+  let rc := ("RC", Option.none, Expr.importFile "lang/RustCrate.dhall")
+
+  let ruleType := ("Rule", Option.none, Expr.unionType [
+    ("CxxBinary",         Option.some (Expr.field (Expr.var "C") "Binary")),
+    ("CxxLibrary",        Option.some (Expr.field (Expr.var "C") "Library")),
+    ("RustBinary",        Option.some (Expr.field (Expr.var "R") "Binary")),
+    ("RustLibrary",       Option.some (Expr.field (Expr.var "R") "Library")),
+    ("HaskellBinary",     Option.some (Expr.field (Expr.var "H") "Binary")),
+    ("HaskellLibrary",    Option.some (Expr.field (Expr.var "H") "Library")),
+    ("LeanBinary",        Option.some (Expr.field (Expr.var "L") "Binary")),
+    ("LeanLibrary",       Option.some (Expr.field (Expr.var "L") "Library")),
+    ("NvBinary",          Option.some (Expr.field (Expr.var "N") "Binary")),
+    ("NvLibrary",         Option.some (Expr.field (Expr.var "N") "Library")),
+    ("PureScriptApp",     Option.some (Expr.field (Expr.var "PS") "App")),
+    ("PureScriptBinary",  Option.some (Expr.field (Expr.var "PS") "Binary")),
+    ("PureScriptLibrary", Option.some (Expr.field (Expr.var "PS") "Library")),
+    ("Genrule",           Option.some (Expr.field (Expr.var "G") "Genrule")),
+    ("NixCxxBinary",      Option.some (Expr.field (Expr.var "NC") "NixBinary")),
+    ("CratesIo",          Option.some (Expr.field (Expr.var "RC") "CratesIo")),
+    ("HttpArchive",       Option.some (Expr.field (Expr.var "RC") "HttpArchive"))
+  ])
+
+  let exports := buildRecord do
+    field "Rule"              (Expr.var "Rule")
+    field "cxxBinary"         (Expr.var "Rule.CxxBinary")
+    field "cxxLibrary"        (Expr.var "Rule.CxxLibrary")
+    field "rustBinary"        (Expr.var "Rule.RustBinary")
+    field "rustLibrary"       (Expr.var "Rule.RustLibrary")
+    field "haskellBinary"     (Expr.var "Rule.HaskellBinary")
+    field "haskellLibrary"    (Expr.var "Rule.HaskellLibrary")
+    field "leanBinary"        (Expr.var "Rule.LeanBinary")
+    field "leanLibrary"       (Expr.var "Rule.LeanLibrary")
+    field "nvBinary"          (Expr.var "Rule.NvBinary")
+    field "nvLibrary"         (Expr.var "Rule.NvLibrary")
+    field "purescriptApp"     (Expr.var "Rule.PureScriptApp")
+    field "purescriptBinary"  (Expr.var "Rule.PureScriptBinary")
+    field "purescriptLibrary" (Expr.var "Rule.PureScriptLibrary")
+    field "genrule"           (Expr.var "Rule.Genrule")
+    field "nixCxxBinary"      (Expr.var "Rule.NixCxxBinary")
+    field "cratesIo"          (Expr.var "Rule.CratesIo")
+    field "httpArchive"       (Expr.var "Rule.HttpArchive")
+
+  Expr.letChain [c, r, h, l, n, ps, g, nc, rc, ruleType] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                // package.dhall (top-level)
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitPackageDhall : Expr :=
+  let triple := ("Triple", Option.none, Expr.importFile "core/Triple.dhall")
+  let dep    := ("Dep",    Option.none, Expr.importFile "core/Dep.dhall")
+  let vis    := ("Vis",    Option.none, Expr.importFile "core/Vis.dhall")
+  let res    := ("Res",    Option.none, Expr.importFile "core/Resource.dhall")
+  let tc     := ("TC",     Option.none, Expr.importFile "build/Toolchain.dhall")
+  let cxx    := ("Cxx",    Option.none, Expr.importFile "lang/Cxx.dhall")
+  let hs     := ("Hs",     Option.none, Expr.importFile "lang/Haskell.dhall")
+  let rs     := ("Rs",     Option.none, Expr.importFile "lang/Rust.dhall")
+  let ln     := ("Ln",     Option.none, Expr.importFile "lang/Lean.dhall")
+  let nv     := ("Nv",     Option.none, Expr.importFile "lang/Nv.dhall")
+  let ps     := ("PS",     Option.none, Expr.importFile "lang/PureScript.dhall")
+  let gen    := ("Gen",    Option.none, Expr.importFile "lang/Genrule.dhall")
+  let nc     := ("NC",     Option.none, Expr.importFile "lang/NixCxx.dhall")
+  let rc     := ("RC",     Option.none, Expr.importFile "lang/RustCrate.dhall")
+  let rule   := ("Rule",   Option.none, Expr.importFile "build/Rule.dhall")
+
+  let exports := buildRecord do
+    field "Triple"   (Expr.var "Triple")
+    field "Dep"      (Expr.field (Expr.var "Dep") "Dep")
+    field "dep"      (Expr.var "Dep")
+    field "vis"      (Expr.var "Vis")
+    field "resource" (Expr.var "Res")
+    field "toolchain" (Expr.var "TC")
+    field "lang"     (buildRecord do
+      field "Cxx"        (Expr.var "Cxx")
+      field "Haskell"    (Expr.var "Hs")
+      field "Rust"       (Expr.var "Rs")
+      field "Lean"       (Expr.var "Ln")
+      field "Nv"         (Expr.var "Nv")
+      field "PureScript" (Expr.var "PS")
+      field "Genrule"    (Expr.var "Gen")
+      field "NixCxx"     (Expr.var "NC")
+      field "RustCrate"  (Expr.var "RC"))
+    field "rule"     (Expr.var "Rule")
+
+  Expr.letChain [triple, dep, vis, res, tc, cxx, hs, rs, ln, nv, ps, gen, nc, rc, rule] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                               // updated prelude file list
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
 def preludeFiles : List (String × Expr) :=
   [ ("core/Triple.dhall",       emitTripleDhall)
   , ("core/Dep.dhall",          emitDepDhall)
@@ -661,12 +1023,15 @@ def preludeFiles : List (String × Expr) :=
   , ("lang/Cxx.dhall",          emitCxxDhall)
   , ("lang/Haskell.dhall",      emitHaskellDhall)
   , ("lang/Rust.dhall",         emitRustDhall)
+  , ("lang/Lean.dhall",         emitLeanDhall)
+  , ("lang/Nv.dhall",           emitNvDhall)
+  , ("lang/PureScript.dhall",   emitPureScriptDhall)
   , ("lang/Genrule.dhall",      emitGenruleDhall)
+  , ("lang/NixCxx.dhall",       emitNixCxxDhall)
+  , ("lang/RustCrate.dhall",    emitRustCrateDhall)
+  , ("build/Rule.dhall",        emitRuleDhall)
+  , ("package.dhall",           emitPackageDhall)
   ]
-
-/-- Render all prelude files. Returns (path, content) pairs. -/
-def renderPrelude : List (String × String) :=
-  preludeFiles.map fun (path, expr) => (path, render expr ++ "\n")
 
 
 end Continuity.Codegen.Build
