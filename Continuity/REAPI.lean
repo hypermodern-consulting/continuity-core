@@ -91,10 +91,10 @@ def serializeCommand (cmd : Command) : ByteArray :=
 /-- Serialize a Directory deterministically for hashing. -/
 def serializeDirectory (dir : Directory) : ByteArray :=
   let fileParts := dir.files.map fun f =>
-    f.name ++ ":" ++ Continuity.Crypto.SHA256.toHex f.digest.hash ++
+    f.name ++ ":" ++ Continuity.Crypto.SHA256.toHex f.digest.hash.bytes ++
     (if f.isExecutable then ":x" else "")
   let dirParts := dir.directories.map fun d =>
-    d.name ++ ":" ++ Continuity.Crypto.SHA256.toHex d.digest.hash
+    d.name ++ ":" ++ Continuity.Crypto.SHA256.toHex d.digest.hash.bytes
   (String.intercalate "\x00" (fileParts ++ dirParts)).toUTF8
 
 

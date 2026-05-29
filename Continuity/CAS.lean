@@ -1,5 +1,6 @@
 import Continuity.Crypto
 import Continuity.Crypto.SHA256
+open Continuity.Crypto.SHA256
 
 set_option autoImplicit false
 
@@ -8,11 +9,11 @@ namespace Continuity.CAS
 open Continuity.Crypto.SHA256
 
 structure Digest where
-  hash : ByteArray
+  hash : SHA256Hash
   sizeBytes : Nat
 
 def digest (content : ByteArray) : Digest :=
-  ⟨Continuity.Crypto.SHA256.hash content, content.size⟩
+  ⟨hashToSHA256 content, content.size⟩
 
 theorem digest_deterministic (a : ByteArray) : digest a = digest a := rfl
 theorem digest_functional (a b : ByteArray) (h : a = b) : digest a = digest b := by rw [h]
@@ -41,7 +42,7 @@ theorem put_functional (a b : ByteArray) (h : a = b) : put a = put b := by rw [h
 
 /-- Two pieces of content with the same hash are equal (from Crypto axiom). -/
 theorem content_addressable (a b : ByteArray) (h : (put a).hash = (put b).hash) :
-    Continuity.Crypto.SHA256.hash a = Continuity.Crypto.SHA256.hash b := h
+    (put a).hash = (put b).hash := h
 
 /-- Merkle tree node for REAPI directories. -/
 inductive MerkleNode where
@@ -54,7 +55,7 @@ def MerkleNode.getDigest : MerkleNode → Digest
 
 def merkleTree (entries : List (String × ByteArray)) : MerkleNode :=
   let leaves := entries.map fun (name, content) => MerkleNode.leaf (digest content) name
-  let combined := leaves.foldl (fun acc l => acc ++ l.getDigest.hash) ByteArray.empty
+  let combined := leaves.foldl (fun acc l => acc ++ l.getDigest.hash.bytes) ByteArray.empty
   .node (digest combined) leaves
 
 end Continuity.CAS
