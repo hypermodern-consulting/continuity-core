@@ -31,7 +31,7 @@ lean_library(
         "Continuity/Codec/Saml.lean",
         "Continuity/Codec/EVM.lean",
         "Continuity/Codec/Json.lean",
-        "Continuity/Codec/StateMachine.lean",
+        "Continuity/StateMachine.lean",
         "Continuity/Codec/Dhall/Lexer.lean",
         "Continuity/Codec/Dhall/Parser.lean",
         "Continuity/Build/Triple.lean",

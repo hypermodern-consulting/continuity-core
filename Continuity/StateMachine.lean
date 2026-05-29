@@ -1,10 +1,10 @@
-import Continuity.Codec.Box
+
 
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                          // continuity // codec // statemachine
-                                                                statemachine.lean
+                                          // continuity // statemachine
+                                                                                                                           statemachine.lean
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-!
@@ -19,7 +19,7 @@ set_option autoImplicit false
   is a separate concern at the event loop boundary.
 -/
 
-namespace Continuity.Codec.StateMachine
+namespace Continuity.StateMachine
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
@@ -525,4 +525,4 @@ def exampleDaemonTrace : List DaemonEvent :=
   let (finalState, actions) := m.run exampleDaemonTrace
   (repr finalState, actions.length)
 
-end Continuity.Codec.StateMachine
+end Continuity.StateMachine

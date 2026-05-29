@@ -27,7 +27,7 @@ import Continuity.Codec.Zmtp
 import Continuity.Codec.Saml
 import Continuity.Codec.EVM
 import Continuity.Codec.Json
-import Continuity.Codec.StateMachine
+import Continuity.StateMachine
 import Continuity.Codec.Dhall.Lexer
 import Continuity.Codec.Dhall.Parser
 import Continuity.Build.Triple
