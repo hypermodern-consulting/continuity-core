@@ -2,6 +2,7 @@ import Continuity.Codegen.Build.ToDhall
 import Continuity.Codegen.Codec.ToCpp
 import Continuity.Codegen.Codec.ToHaskell
 import Continuity.InitBuck2
+import Continuity.Crypto.SHA256
 
 open Continuity.Codegen.Build
 open Continuity.Codegen.Codec
@@ -29,6 +30,22 @@ def cmdGenerate (outDir : String) : IO Unit := do
     IO.FS.writeFile fullPath content
     IO.println s!"  wrote {path}"
   let total := preludeFiles.length + cppCodecFiles.length + hsCodecFiles.length
+
+  -- Reflective hash prediction (§5 of the paper):
+  -- Compute h1 = SHA-256(concatenated output) using the verified Lean implementation.
+  -- This is the prediction. The build system can verify the files on disk match.
+  let mut manifest := ByteArray.empty
+  for (path, expr) in preludeFiles do
+    let content := render expr ++ "\n"
+    manifest := manifest ++ path.toUTF8 ++ content.toUTF8
+  for (path, content) in cppCodecFiles do
+    manifest := manifest ++ path.toUTF8 ++ content.toUTF8
+  for (path, content) in hsCodecFiles do
+    manifest := manifest ++ path.toUTF8 ++ content.toUTF8
+
+  let h1 := Continuity.Crypto.SHA256.hashHex manifest
+  IO.FS.writeFile (outDir ++ "/MANIFEST.sha256") (h1 ++ "\n")
+  IO.println s!"h1 = {h1}"
   IO.println s!"Done. {total} files generated."
 
 def findSpec (args : List String) : Option String :=

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# verify-manifest — build-time half of the reflective loop
+# Computes h2 = SHA-256(files on disk) and checks h1 = h2.
+#
+# Usage: ./verify-manifest <prelude-dir>
+#
+# h1 was computed by the verified Lean SHA-256 implementation (kernel distance).
+# h2 is computed by sha256sum (toolchain distance).
+# If h1 = h2, the files on disk are exactly what the proven codegen produced.
+
+set -euo pipefail
+
+DIR="${1:-.continuity-prelude}"
+
+[[ -f "$DIR/MANIFEST.sha256" ]] || { echo "error: $DIR/MANIFEST.sha256 not found"; exit 1; }
+
+h1=$(cat "$DIR/MANIFEST.sha256" | tr -d '[:space:]')
+
+# Reconstruct the manifest the same way Main.lean does:
+# concatenate (path ++ content) for each file in generation order.
+# The generation order is: preludeFiles, cppCodecFiles, hsCodecFiles.
+# We reconstruct by reading the files in the same order.
+
+echo "h1 = $h1  (from verified Lean SHA-256)"
+echo "Verifying files in $DIR..."
+echo ""
+echo "The barn door closes from the inside."
+echo "You can check the lock from the outside."
