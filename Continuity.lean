@@ -18,3 +18,4 @@ import Continuity.Build.Resource
 import Continuity.Build.Digest
 import Continuity.Build.Command
 import Continuity.Build.Action
+import Continuity.Codegen.Build.ToDhall
