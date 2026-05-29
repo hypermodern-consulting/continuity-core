@@ -231,7 +231,7 @@ def listLit (elements : List Expr) : Expr :=
   Expr.list elements Option.none
 
 def emptyList (elemType : Expr) : Expr :=
-  Expr.list [] (Option.some elemType)
+  Expr.list [] (Option.some (Expr.app (Expr.builtin "List") elemType))
 
 -- ── binding shortcuts ─────────────────────────────────────────────────────────
 

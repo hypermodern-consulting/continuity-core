@@ -2,6 +2,8 @@ import Continuity.Build.Triple
 import Continuity.Build.Dep
 import Continuity.Build.Vis
 import Continuity.Build.Resource
+import Continuity.Build.Toolchain
+import Continuity.Build.Cxx
 import Continuity.Emit.Dhall.Ast
 import Continuity.Emit.Dhall.Render
 import Continuity.Emit.Dhall.Build
@@ -234,5 +236,211 @@ def emitTripleDhall : Expr :=
 -- the money shot: does the loop close?
 #eval render emitTripleDhall
 
+
+-- end of original emitters — new modules follow
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                         // Dep.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitDepDhall : Expr :=
+  let depType := ("Dep", Option.some (Expr.ty "Type"),
+    Expr.unionType [
+      ("Local",     Option.some (Expr.ty "Text")),
+      ("Flake",     Option.some (Expr.ty "Text")),
+      ("External",  Option.some (buildRecordType do
+        field "hash" (Expr.ty "Text")
+        field "name" (Expr.ty "Text"))),
+      ("PkgConfig", Option.some (Expr.ty "Text"))
+    ])
+
+  let local_   := ("local",     Option.none, Expr.var "Dep.Local")
+  let flake_   := ("flake",     Option.none, Expr.var "Dep.Flake")
+  let pkgcfg   := ("pkgconfig", Option.none, Expr.var "Dep.PkgConfig")
+  let external := ("external",  Option.none,
+    Expr.lambda "hash" (Expr.ty "Text")
+      (Expr.lambda "name" (Expr.ty "Text")
+        (Expr.app (Expr.var "Dep.External") (buildRecord do
+          field "hash" (Expr.var "hash")
+          field "name" (Expr.var "name")))))
+
+  let nix := ("nix", Option.none,
+    Expr.lambda "p" (Expr.ty "Text")
+      (Expr.app (Expr.var "Dep.Flake")
+        (Expr.interpolation ["nixpkgs#", ""] [Expr.var "p"])))
+
+  let exports := buildRecord do
+    field "Dep"       (Expr.var "Dep")
+    field "local"     (Expr.var "local")
+    field "flake"     (Expr.var "flake")
+    field "external"  (Expr.var "external")
+    field "pkgconfig" (Expr.var "pkgconfig")
+    field "nix"       (Expr.var "nix")
+
+  Expr.letChain [depType, local_, flake_, pkgcfg, external, nix] exports
+
+#eval render emitDepDhall
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                    // Toolchain.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitToolchainDhall : Expr :=
+  let cxxTc := ("CxxToolchain", Option.none, buildRecordType do
+    field "name"           (Expr.ty "Text")
+    field "c_extra_flags"  (Expr.listOf (Expr.ty "Text"))
+    field "cxx_extra_flags" (Expr.listOf (Expr.ty "Text"))
+    field "link_style"     (Expr.ty "Text"))
+
+  let cxxDflt := ("cxxToolchain", Option.none,
+    Expr.lambda "name" (Expr.ty "Text") (buildRecord do
+      field "name"           (Expr.var "name")
+      field "c_extra_flags"  (Expr.emptyList (Expr.ty "Text"))
+      field "cxx_extra_flags" (Expr.emptyList (Expr.ty "Text"))
+      field "link_style"     (Expr.str "static")))
+
+  let hsTc := ("HaskellToolchain", Option.none, buildRecordType do
+    field "name"           (Expr.ty "Text")
+    field "compiler_flags" (Expr.listOf (Expr.ty "Text")))
+
+  let hsDflt := ("haskellToolchain", Option.none,
+    Expr.lambda "name" (Expr.ty "Text") (buildRecord do
+      field "name"           (Expr.var "name")
+      field "compiler_flags" (Expr.emptyList (Expr.ty "Text"))))
+
+  let rustTc := ("RustToolchain", Option.none, buildRecordType do
+    field "name"            (Expr.ty "Text")
+    field "default_edition" (Expr.ty "Text")
+    field "rustc_flags"     (Expr.listOf (Expr.ty "Text")))
+
+  let rustDflt := ("rustToolchain", Option.none,
+    Expr.lambda "name" (Expr.ty "Text") (buildRecord do
+      field "name"            (Expr.var "name")
+      field "default_edition" (Expr.str "2021")
+      field "rustc_flags"     (Expr.emptyList (Expr.ty "Text"))))
+
+  let lnTc := ("LeanToolchain", Option.none, buildRecordType do
+    field "name"       (Expr.ty "Text")
+    field "lean_flags" (Expr.listOf (Expr.ty "Text")))
+
+  let lnDflt := ("leanToolchain", Option.none,
+    Expr.lambda "name" (Expr.ty "Text") (buildRecord do
+      field "name"       (Expr.var "name")
+      field "lean_flags" (Expr.emptyList (Expr.ty "Text"))))
+
+  let nvTc := ("NvToolchain", Option.none, buildRecordType do
+    field "name"     (Expr.ty "Text")
+    field "nv_archs" (Expr.listOf (Expr.ty "Text")))
+
+  let nvDflt := ("nvToolchain", Option.none,
+    Expr.lambda "name" (Expr.ty "Text") (buildRecord do
+      field "name"     (Expr.var "name")
+      field "nv_archs" (Expr.listLit [Expr.str "sm_90"])))
+
+  let execPlat := ("ExecutionPlatform", Option.none, buildRecordType do
+    field "name"           (Expr.ty "Text")
+    field "local_enabled"  (Expr.ty "Bool")
+    field "remote_enabled" (Expr.ty "Bool"))
+
+  let execDflt := ("executionPlatform", Option.none,
+    Expr.lambda "name" (Expr.ty "Text") (buildRecord do
+      field "name"           (Expr.var "name")
+      field "local_enabled"  Expr.tt
+      field "remote_enabled" Expr.ff))
+
+  let exports := buildRecord do
+    field "CxxToolchain"      (Expr.var "CxxToolchain")
+    field "cxxToolchain"      (Expr.var "cxxToolchain")
+    field "HaskellToolchain"  (Expr.var "HaskellToolchain")
+    field "haskellToolchain"  (Expr.var "haskellToolchain")
+    field "RustToolchain"     (Expr.var "RustToolchain")
+    field "rustToolchain"     (Expr.var "rustToolchain")
+    field "LeanToolchain"     (Expr.var "LeanToolchain")
+    field "leanToolchain"     (Expr.var "leanToolchain")
+    field "NvToolchain"       (Expr.var "NvToolchain")
+    field "nvToolchain"       (Expr.var "nvToolchain")
+    field "ExecutionPlatform" (Expr.var "ExecutionPlatform")
+    field "executionPlatform" (Expr.var "executionPlatform")
+
+  Expr.letChain
+    [cxxTc, cxxDflt, hsTc, hsDflt, rustTc, rustDflt,
+     lnTc, lnDflt, nvTc, nvDflt, execPlat, execDflt]
+    exports
+
+#eval render emitToolchainDhall
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                       // Cxx.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitCxxDhall : Expr :=
+  let cxxStdNames := ["Cxx11", "Cxx14", "Cxx17", "Cxx20", "Cxx23"]
+
+  let cxxStd := ("CxxStd", Option.some (Expr.ty "Type"), emitEnum cxxStdNames)
+
+  let depRef := Expr.importFile "core/Dep.dhall"
+  let visRef := Expr.importFile "core/Vis.dhall"
+  let d := ("D", Option.none, depRef)
+  let v := ("V", Option.none, visRef)
+
+  let binaryType := ("Binary", Option.none, buildRecordType do
+    field "name"    (Expr.ty "Text")
+    field "srcs"    (Expr.listOf (Expr.ty "Text"))
+    field "deps"    (Expr.listOf (Expr.field (Expr.var "D") "Dep"))
+    field "std"     (Expr.var "CxxStd")
+    field "cflags"  (Expr.listOf (Expr.ty "Text"))
+    field "ldflags" (Expr.listOf (Expr.ty "Text"))
+    field "vis"     (Expr.field (Expr.var "V") "Vis"))
+
+  let binaryFn := ("binary", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" (Expr.listOf (Expr.ty "Text"))
+        (Expr.lambda "deps" (Expr.listOf (Expr.field (Expr.var "D") "Dep"))
+          (buildRecord do
+            field "name"    (Expr.var "name")
+            field "srcs"    (Expr.var "srcs")
+            field "deps"    (Expr.var "deps")
+            field "std"     (Expr.enumVal "CxxStd" cxxStdNames "Cxx17")
+            field "cflags"  (Expr.emptyList (Expr.ty "Text"))
+            field "ldflags" (Expr.emptyList (Expr.ty "Text"))
+            field "vis"     (Expr.field (Expr.var "V") "public")))))
+
+  let libraryType := ("Library", Option.none, buildRecordType do
+    field "name"   (Expr.ty "Text")
+    field "srcs"   (Expr.listOf (Expr.ty "Text"))
+    field "hdrs"   (Expr.listOf (Expr.ty "Text"))
+    field "deps"   (Expr.listOf (Expr.field (Expr.var "D") "Dep"))
+    field "std"    (Expr.var "CxxStd")
+    field "cflags" (Expr.listOf (Expr.ty "Text"))
+    field "vis"    (Expr.field (Expr.var "V") "Vis"))
+
+  let libraryFn := ("library", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" (Expr.listOf (Expr.ty "Text"))
+        (Expr.lambda "deps" (Expr.listOf (Expr.field (Expr.var "D") "Dep"))
+          (buildRecord do
+            field "name"   (Expr.var "name")
+            field "srcs"   (Expr.var "srcs")
+            field "deps"   (Expr.var "deps")
+            field "hdrs"   (Expr.emptyList (Expr.ty "Text"))
+            field "std"    (Expr.enumVal "CxxStd" cxxStdNames "Cxx17")
+            field "cflags" (Expr.emptyList (Expr.ty "Text"))
+            field "vis"    (Expr.field (Expr.var "V") "public")))))
+
+  let exports := buildRecord do
+    field "CxxStd"  (Expr.var "CxxStd")
+    field "Binary"  (Expr.var "Binary")
+    field "binary"  (Expr.var "binary")
+    field "Library" (Expr.var "Library")
+    field "library" (Expr.var "library")
+
+  Expr.letChain
+    [d, v, cxxStd, binaryType, binaryFn, libraryType, libraryFn]
+    exports
+
+#eval render emitCxxDhall
 
 end Continuity.Codegen.Build

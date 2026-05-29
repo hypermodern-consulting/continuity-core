@@ -18,4 +18,12 @@ import Continuity.Build.Resource
 import Continuity.Build.Digest
 import Continuity.Build.Command
 import Continuity.Build.Action
+import Continuity.Build.Toolchain
+import Continuity.Build.Cxx
+import Continuity.Build.Haskell
+import Continuity.Build.Rust
+import Continuity.Build.Lean4
+import Continuity.Build.Nv
+import Continuity.Build.Genrule
+import Continuity.Build.Rule
 import Continuity.Codegen.Build.ToDhall
