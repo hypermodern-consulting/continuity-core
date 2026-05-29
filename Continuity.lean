@@ -50,3 +50,9 @@ import Continuity.Codegen.Build.ToDhall
 import Continuity.Codegen.Codec.Spec
 import Continuity.Codegen.Codec.ToCpp
 import Continuity.Codegen.Codec.ToHaskell
+import Continuity.Crypto
+import Continuity.Crypto.SHA256
+import Continuity.Derivation
+import Continuity.CAS
+import Continuity.NAR
+import Continuity.REAPI
