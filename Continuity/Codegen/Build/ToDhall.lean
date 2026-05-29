@@ -443,4 +443,230 @@ def emitCxxDhall : Expr :=
 
 #eval render emitCxxDhall
 
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                         // Vis.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitVisDhall : Expr :=
+  let visType := ("Vis", Option.none, emitEnum ["Public", "Private"])
+  let exports := buildRecord do
+    field "Vis"     (Expr.var "Vis")
+    field "public"  (Expr.enumVal "Vis" ["Public", "Private"] "Public")
+    field "private" (Expr.enumVal "Vis" ["Public", "Private"] "Private")
+  Expr.letChain [visType] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                    // Resource.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitResourceDhall : Expr :=
+  let resType := ("Resource", Option.some (Expr.ty "Type"),
+    Expr.unionType [
+      ("Pure",       Option.none),
+      ("Network",    Option.none),
+      ("Auth",       Option.some (Expr.ty "Text")),
+      ("Sandbox",    Option.some (Expr.ty "Text")),
+      ("Filesystem", Option.some (Expr.ty "Text"))
+    ])
+  let resourcesType := ("Resources", Option.some (Expr.ty "Type"),
+    Expr.listOf (Expr.var "Resource"))
+  let pure_  := ("pure",  Option.none, Expr.emptyList (Expr.var "Resource"))
+  let net    := ("network", Option.none, Expr.listLit [Expr.var "Resource.Network"])
+  let auth   := ("auth", Option.none,
+    Expr.lambda "provider" (Expr.ty "Text")
+      (Expr.listLit [Expr.app (Expr.var "Resource.Auth") (Expr.var "provider")]))
+  let combine := ("combine", Option.none,
+    Expr.lambda "r" (Expr.var "Resources")
+      (Expr.lambda "s" (Expr.var "Resources")
+        (Expr.binop BinOp.listAppend (Expr.var "r") (Expr.var "s"))))
+  let exports := buildRecord do
+    field "Resource"  (Expr.var "Resource")
+    field "Resources" (Expr.var "Resources")
+    field "pure"      (Expr.var "pure")
+    field "network"   (Expr.var "network")
+    field "auth"      (Expr.var "auth")
+    field "combine"   (Expr.var "combine")
+  Expr.letChain [resType, resourcesType, pure_, net, auth, combine] exports
+
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                   // Haskell.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+private def depListTy : Expr := Expr.listOf (Expr.field (Expr.var "D") "Dep")
+private def textListTy : Expr := Expr.listOf (Expr.ty "Text")
+private def visTy : Expr := Expr.field (Expr.var "V") "Vis"
+private def visDflt : Expr := Expr.field (Expr.var "V") "public"
+private def emptyTextList : Expr := Expr.emptyList (Expr.ty "Text")
+
+def emitHaskellDhall : Expr :=
+  let d := ("D", Option.none, Expr.importFile "core/Dep.dhall")
+  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let binaryType := ("Binary", Option.none, buildRecordType do
+    field "name"     (Expr.ty "Text")
+    field "srcs"     textListTy
+    field "deps"     depListTy
+    field "main"     (Expr.ty "Text")
+    field "ghcFlags" textListTy
+    field "vis"      visTy)
+  let binaryFn := ("binary", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (Expr.lambda "deps" depListTy
+          (buildRecord do
+            field "name"     (Expr.var "name")
+            field "srcs"     (Expr.var "srcs")
+            field "deps"     (Expr.var "deps")
+            field "main"     (Expr.str "Main")
+            field "ghcFlags" emptyTextList
+            field "vis"      visDflt))))
+  let libraryType := ("Library", Option.none, buildRecordType do
+    field "name"     (Expr.ty "Text")
+    field "srcs"     textListTy
+    field "deps"     depListTy
+    field "modules"  textListTy
+    field "ghcFlags" textListTy
+    field "vis"      visTy)
+  let libraryFn := ("library", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (Expr.lambda "deps" depListTy
+          (buildRecord do
+            field "name"     (Expr.var "name")
+            field "srcs"     (Expr.var "srcs")
+            field "deps"     (Expr.var "deps")
+            field "modules"  emptyTextList
+            field "ghcFlags" emptyTextList
+            field "vis"      visDflt))))
+  let exports := buildRecord do
+    field "Binary"  (Expr.var "Binary")
+    field "binary"  (Expr.var "binary")
+    field "Library" (Expr.var "Library")
+    field "library" (Expr.var "library")
+  Expr.letChain [d, v, binaryType, binaryFn, libraryType, libraryFn] exports
+
+
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                   // Rust.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitRustDhall : Expr :=
+  let d := ("D", Option.none, Expr.importFile "core/Dep.dhall")
+  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let editionNames := ["E2015", "E2018", "E2021", "E2024"]
+  let edition := ("Edition", Option.some (Expr.ty "Type"), emitEnum editionNames)
+  let ed2021 := Expr.enumVal "Edition" editionNames "E2021"
+
+  let binaryType := ("Binary", Option.none, buildRecordType do
+    field "name"      (Expr.ty "Text")
+    field "srcs"      textListTy
+    field "deps"      depListTy
+    field "edition"   (Expr.var "Edition")
+    field "features"  textListTy
+    field "rustflags" textListTy
+    field "vis"       visTy)
+
+  let binaryFn := ("binary", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (Expr.lambda "deps" depListTy
+          (buildRecord do
+            field "name"      (Expr.var "name")
+            field "srcs"      (Expr.var "srcs")
+            field "deps"      (Expr.var "deps")
+            field "edition"   ed2021
+            field "features"  emptyTextList
+            field "rustflags" emptyTextList
+            field "vis"       visDflt))))
+
+  let libraryType := ("Library", Option.none, buildRecordType do
+    field "name"       (Expr.ty "Text")
+    field "srcs"       textListTy
+    field "deps"       depListTy
+    field "edition"    (Expr.var "Edition")
+    field "crate_name" (Expr.optionalOf (Expr.ty "Text"))
+    field "features"   textListTy
+    field "proc_macro" (Expr.ty "Bool")
+    field "vis"        visTy)
+
+  let libraryFn := ("library", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (Expr.lambda "deps" depListTy
+          (buildRecord do
+            field "name"       (Expr.var "name")
+            field "srcs"       (Expr.var "srcs")
+            field "deps"       (Expr.var "deps")
+            field "edition"    ed2021
+            field "crate_name" (Expr.none (Expr.ty "Text"))
+            field "features"   emptyTextList
+            field "proc_macro" Expr.ff
+            field "vis"        visDflt))))
+
+  let exports := buildRecord do
+    field "Edition" (Expr.var "Edition")
+    field "Binary"  (Expr.var "Binary")
+    field "binary"  (Expr.var "binary")
+    field "Library" (Expr.var "Library")
+    field "library" (Expr.var "library")
+
+  Expr.letChain [d, v, edition, binaryType, binaryFn, libraryType, libraryFn] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                   // Genrule.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitGenruleDhall : Expr :=
+  let v := ("V", Option.none, Expr.importFile "core/Vis.dhall")
+  let genruleType := ("Genrule", Option.none, buildRecordType do
+    field "name" (Expr.ty "Text")
+    field "out"  (Expr.ty "Text")
+    field "cmd"  (Expr.ty "Text")
+    field "srcs" textListTy
+    field "vis"  visTy)
+  let genruleFn := ("genrule", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "out" (Expr.ty "Text")
+        (Expr.lambda "cmd" (Expr.ty "Text")
+          (buildRecord do
+            field "name" (Expr.var "name")
+            field "out"  (Expr.var "out")
+            field "cmd"  (Expr.var "cmd")
+            field "srcs" emptyTextList
+            field "vis"  visDflt))))
+  let exports := buildRecord do
+    field "Genrule" (Expr.var "Genrule")
+    field "genrule" (Expr.var "genrule")
+  Expr.letChain [v, genruleType, genruleFn] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                   // file writing pipeline
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+/-- All prelude modules and their output paths. -/
+def preludeFiles : List (String × Expr) :=
+  [ ("core/Triple.dhall",       emitTripleDhall)
+  , ("core/Dep.dhall",          emitDepDhall)
+  , ("core/Vis.dhall",          emitVisDhall)
+  , ("core/Resource.dhall",     emitResourceDhall)
+  , ("build/Toolchain.dhall",   emitToolchainDhall)
+  , ("lang/Cxx.dhall",          emitCxxDhall)
+  , ("lang/Haskell.dhall",      emitHaskellDhall)
+  , ("lang/Rust.dhall",         emitRustDhall)
+  , ("lang/Genrule.dhall",      emitGenruleDhall)
+  ]
+
+/-- Render all prelude files. Returns (path, content) pairs. -/
+def renderPrelude : List (String × String) :=
+  preludeFiles.map fun (path, expr) => (path, render expr ++ "\n")
+
+
 end Continuity.Codegen.Build
