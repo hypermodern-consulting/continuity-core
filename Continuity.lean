@@ -57,3 +57,5 @@ import Continuity.CAS
 import Continuity.NAR
 import Continuity.REAPI
 import Continuity.InitBuck2
+import Continuity.Algebra.Grade
+import Continuity.Algebra.GradedMonad
