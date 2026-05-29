@@ -1,9 +1,2 @@
 load("@prelude//toolchains:demo.bzl", "system_demo_toolchains")
-load(":lean.bzl", "lean_toolchain")
-
 system_demo_toolchains()
-
-lean_toolchain(
-    name = "lean",
-    visibility = ["PUBLIC"],
-)

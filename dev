@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+PRELUDE="$ROOT/.continuity-prelude"
+HAND_WRITTEN="/tmp/continuity-prelude/continuity-prelude"
+
+export PATH="$HOME/.elan/bin:$PATH"
+export ELAN_TOOLCHAIN=leanprover/lean4:v4.30.0
+
+LEAN_TOOLCHAIN="$HOME/.elan/toolchains/leanprover--lean4---v4.30.0"
+
+cmd_generate() {
+    echo "→ lake build"
+    lake build 2>&1 | grep -E '(Build completed|error)' || true
+    echo "→ generating Dhall prelude"
+    mkdir -p "$PRELUDE"
+    lake exe continuity "$PRELUDE" 2>&1 | tail -1
+    if [ -d "$HAND_WRITTEN/render" ]; then
+        cp "$HAND_WRITTEN/Prelude.dhall" "$PRELUDE/Prelude.dhall" 2>/dev/null || true
+        mkdir -p "$PRELUDE/render/buck2/toolchains"
+        cp "$HAND_WRITTEN/render/buck2/Rule.dhall" "$PRELUDE/render/buck2/Rule.dhall" 2>/dev/null || true
+        cp "$HAND_WRITTEN/render/buck2/to-starlark.dhall" "$PRELUDE/render/buck2/to-starlark.dhall" 2>/dev/null || true
+        cp "$HAND_WRITTEN/render/buck2/package.dhall" "$PRELUDE/render/buck2/package.dhall" 2>/dev/null || true
+        cp "$HAND_WRITTEN/render/buck2/toolchains/"*.dhall "$PRELUDE/render/buck2/toolchains/" 2>/dev/null || true
+    fi
+    echo "  ✓ $(find "$PRELUDE" -name '*.dhall' | wc -l) Dhall files"
+}
+
+cmd_render() {
+    echo "→ rendering Buck2 project"
+
+    # BUCK — genrule bridge until lean.bzl handles hierarchical modules
+    cat > "$ROOT/BUCK" << 'BUCK'
+genrule(
+    name = "continuity",
+    srcs = glob(["Continuity/**/*.lean", "Continuity.lean", "lakefile.lean", "lean-toolchain"]),
+    out = "continuity",
+    cmd = "export PATH=/root/.elan/bin:/usr/bin:/bin:$$PATH ELAN_TOOLCHAIN=leanprover/lean4:v4.30.0 && lake --dir=/home/claude/continuity build && cat /home/claude/continuity/.lake/build/bin/continuity > $OUT",
+    visibility = ["PUBLIC"],
+)
+BUCK
+
+    # toolchains
+    mkdir -p "$ROOT/toolchains"
+    cat > "$ROOT/toolchains/BUCK" << 'TBUCK'
+load("@prelude//toolchains:demo.bzl", "system_demo_toolchains")
+system_demo_toolchains()
+TBUCK
+
+    # .buckconfig
+    cat > "$ROOT/.buckconfig" << BUCKCONFIG
+[cells]
+  root = .
+  prelude = prelude
+  toolchains = toolchains
+  none = none
+[cell_aliases]
+  config = prelude
+  ovr_config = prelude
+  fbcode = none
+  fbsource = none
+  fbcode_macros = none
+  buck = none
+[external_cells]
+  prelude = bundled
+[parser]
+  target_platform_detector_spec = target:root//...->prelude//platforms:default
+[build]
+  execution_platforms = prelude//platforms:default
+BUCKCONFIG
+
+    touch "$ROOT/.buckroot"
+    echo "  ✓ BUCK, .buckconfig, toolchains/BUCK"
+}
+
+cmd_build() {
+    echo "→ buck2 build //:continuity"
+    buck2 build //:continuity 2>&1 | tail -3
+}
+
+cmd_run() {
+    buck2 build //:continuity 2>/dev/null
+    OUTPUT=$(buck2 build //:continuity --show-output 2>&1 | grep 'root//:continuity' | awk '{print $2}')
+    chmod +x "$OUTPUT" 2>/dev/null
+    shift 2>/dev/null || true
+    "$OUTPUT" "$@"
+}
+
+cmd_clean() {
+    echo "→ clean"
+    rm -rf "$PRELUDE" buck-out/ build.dhall
+    rm -f BUCK .buckconfig .buckroot
+    rm -rf toolchains/
+    buck2 kill 2>/dev/null || true
+    echo "  ✓"
+}
+
+cmd_tarball() {
+    echo "→ tarball"
+    cd "$ROOT/.."
+    tar czf /mnt/user-data/outputs/continuity-v12-complete.tar.gz \
+        --exclude='continuity/.lake' \
+        --exclude='continuity/buck-out' \
+        --exclude='continuity/.continuity-prelude' \
+        continuity/
+    echo "  ✓ /mnt/user-data/outputs/continuity-v12-complete.tar.gz"
+}
+
+case "${1:-all}" in
+    generate) cmd_generate ;;
+    render)   cmd_render ;;
+    build)    cmd_build ;;
+    run)      cmd_run "$@" ;;
+    clean)    cmd_clean ;;
+    tarball)  cmd_tarball ;;
+    all)      cmd_generate && cmd_render && cmd_build ;;
+    *)        echo "Usage: ./dev {generate|render|build|run|clean|tarball|all}" && exit 1 ;;
+esac
