@@ -1,0 +1,10 @@
+{
+  "trace_id": "3b4eb7a6-18ba-4f25-8f7a-7ddab98b69be",
+  "exit_code": 3,
+  "error_messages": [
+    "Error evaluating build file: `root//:BUCK`\n\nCaused by:\n    error: Variable `lean_library` not found, did you mean `lua_library`?\n     --> BUCK:1:1\n      |\n    1 | lean_library(\n      | ^^^^^^^^^^^^\n      |\n    "
+  ],
+  "finalizing_error_messages": [
+    "'invocation recorder' failed to finalize\n\nCaused by:\n    Scribe sink not enabled (internal error)\n\nStack backtrace:\n   0: <anyhow::Error as core::convert::From<buck2_error::format::AnyhowWrapperForFormat>>::from\n   1: buck2_error::format::into_anyhow_for_format\n   2: <buck2_error::starlark_error::StarlarkErrorWrapper as core::fmt::Debug>::fmt\n   3: core::fmt::write\n   4: alloc::fmt::format::format_inner\n   5: <buck2_client_ctx::events_ctx::EventsCtx>::finalize::{closure#0}::finalize::{closure#0}\n   6: <tracing::instrument::Instrumented<<buck2_client_ctx::events_ctx::EventsCtx>::finalize_events::{closure#0}> as core::future::future::Future>::poll\n   7: <buck2_client_ctx::events_ctx::EventsCtx>::finalize_events\n   8: buck2::exec_with_logging\n   9: buck2::main::main_with_result\n  10: buck2::main\n  11: std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> !, !>\n  12: std::rt::lang_start::<!>::{closure#0}\n  13: std::rt::lang_start_internal\n  14: main"
+  ]
+}
