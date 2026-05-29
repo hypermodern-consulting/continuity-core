@@ -291,18 +291,37 @@ def jsonModule : CodecModule where
 def stateMachineModule : CodecModule where
   name := "StateMachine"
   namespace_ := "continuity::state_machine"
-  doc := "Protocol state machine DSL — deterministic by construction"
+  doc := "Protocol state machines — Nix daemon handshake + operation loop"
   enums := [
-    ⟨"HandshakeState", [
-      ⟨"Initial", 0, ""⟩, ⟨"ClientHello", 1, ""⟩, ⟨"ServerHello", 2, ""⟩,
-      ⟨"ServerParams", 3, ""⟩, ⟨"ServerFinished", 4, ""⟩,
-      ⟨"ClientFinished", 5, ""⟩, ⟨"Established", 6, ""⟩, ⟨"Failed", 7, ""⟩
-    ], .u8, "TLS-style handshake states"⟩,
-    ⟨"ConnState", [
-      ⟨"Disconnected", 0, ""⟩, ⟨"Connecting", 1, ""⟩, ⟨"Handshaking", 2, ""⟩,
-      ⟨"Established", 3, ""⟩, ⟨"Draining", 4, ""⟩,
-      ⟨"Closed", 5, ""⟩, ⟨"Failed", 6, ""⟩
-    ], .u8, "Generic connection lifecycle"⟩
+    ⟨"ServerState", [
+      ⟨"Init", 0, ""⟩, ⟨"Versioned", 1, ""⟩, ⟨"Features", 2, ""⟩,
+      ⟨"Upgrading", 3, ""⟩, ⟨"NixReady", 4, ""⟩, ⟨"ReapiReady", 5, ""⟩,
+      ⟨"Failed", 6, ""⟩
+    ], .u8, "Server handshake states"⟩,
+    ⟨"ServerAction", [
+      ⟨"SendServerHello", 0, ""⟩, ⟨"SendDaemonVersion", 1, ""⟩,
+      ⟨"SendTrustLevel", 2, ""⟩, ⟨"SendFeatures", 3, ""⟩,
+      ⟨"SendUpgradeOffer", 4, ""⟩, ⟨"SendReapiConfig", 5, ""⟩,
+      ⟨"Ready", 6, ""⟩, ⟨"Fail", 7, ""⟩
+    ], .u8, "Server handshake outputs (intents, not ring ops)"⟩,
+    ⟨"DaemonOpState", [
+      ⟨"AwaitingOp", 0, ""⟩, ⟨"Processing", 1, ""⟩,
+      ⟨"SendingStderr", 2, ""⟩, ⟨"SendingResult", 3, ""⟩,
+      ⟨"OpComplete", 4, ""⟩, ⟨"OpFailed", 5, ""⟩
+    ], .u8, "Daemon operation loop states"⟩,
+    ⟨"Feature", [
+      ⟨"ReapiV2", 0, ""⟩, ⟨"CasSha256", 1, ""⟩,
+      ⟨"StreamingNar", 2, ""⟩, ⟨"SignedNarinfo", 3, ""⟩
+    ], .u8, "Negotiated features"⟩,
+    ⟨"TrustLevel", [
+      ⟨"Unknown", 0, ""⟩, ⟨"Trusted", 1, ""⟩, ⟨"Untrusted", 2, ""⟩
+    ], .u8, ""⟩
+  ]
+  structs := [
+    ⟨"ProtocolVersion", [⟨"value", .u64le, "major << 8 | minor"⟩], ""⟩,
+    ⟨"ReapiConfig", [
+      ⟨"instanceName", .lenPrefixed, ""⟩, ⟨"digestFunction", .u32le, "0 = SHA256"⟩
+    ], ""⟩
   ]
 
 def varintModule : CodecModule where
