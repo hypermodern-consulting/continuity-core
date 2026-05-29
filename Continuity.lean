@@ -29,3 +29,4 @@ import Continuity.Build.Rule
 import Continuity.Codegen.Build.ToDhall
 import Continuity.Codec.Dhall.Lexer
 import Continuity.Codec.Dhall.Parser
+import Continuity.Build.BzlFile

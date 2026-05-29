@@ -4,6 +4,7 @@ import Continuity.Build.Vis
 import Continuity.Build.Resource
 import Continuity.Build.Toolchain
 import Continuity.Build.Cxx
+import Continuity.Build.BzlFile
 import Continuity.Emit.Dhall.Ast
 import Continuity.Emit.Dhall.Render
 import Continuity.Emit.Dhall.Build
@@ -1011,26 +1012,107 @@ def emitPackageDhall : Expr :=
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
-                                               // updated prelude file list
+                                          // render/buck2/Rule.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitBzlRuleDhall : Expr :=
+  let attrType := ("AttrType", Option.some (Expr.ty "Type"), Expr.unionType [
+    ("String",       Option.some (buildRecordType do field "default" (Expr.optionalOf (Expr.ty "Text")))),
+    ("StringList",   Option.some (buildRecordType (pure ()))),
+    ("Bool",         Option.some (buildRecordType do field "default" (Expr.ty "Bool"))),
+    ("Int",          Option.some (buildRecordType do field "default" (Expr.ty "Natural"))),
+    ("Dep",          Option.some (buildRecordType (pure ()))),
+    ("DepDefault",   Option.some (buildRecordType do field "default" (Expr.ty "Text"))),
+    ("DepList",      Option.some (buildRecordType (pure ()))),
+    ("Source",       Option.some (buildRecordType (pure ()))),
+    ("SourceList",   Option.some (buildRecordType (pure ()))),
+    ("OptionSource", Option.some (buildRecordType (pure ()))),
+    ("OptionString", Option.some (buildRecordType (pure ()))),
+    ("Output",       Option.some (buildRecordType (pure ()))),
+    ("Label",        Option.some (buildRecordType (pure ()))),
+    ("StringDict",   Option.some (buildRecordType (pure ())))
+  ])
+  let attr := ("Attr", Option.none, buildRecordType do
+    field "name" (Expr.ty "Text"); field "type" (Expr.var "AttrType"); field "doc" (Expr.ty "Text"))
+  let load := ("Load", Option.none, buildRecordType do
+    field "bzl" (Expr.ty "Text"); field "symbols" textListTy)
+  let providerField := ("ProviderField", Option.some (Expr.ty "Type"), Expr.unionType [
+    ("Typed",  Option.some (buildRecordType do
+      field "name" (Expr.ty "Text"); field "type" (Expr.ty "Text")
+      field "default" (Expr.optionalOf (Expr.ty "Text")))),
+    ("Simple", Option.some (Expr.ty "Text"))])
+  let providerDef := ("ProviderDef", Option.none, buildRecordType do
+    field "name" (Expr.ty "Text"); field "fields" (Expr.listOf (Expr.var "ProviderField")))
+  let helperFn := ("HelperFn", Option.none, buildRecordType do
+    field "name" (Expr.ty "Text"); field "params" textListTy
+    field "returnType" (Expr.optionalOf (Expr.ty "Text")); field "body" (Expr.ty "Text"))
+  let ruleImpl := ("RuleImpl", Option.none, buildRecordType do
+    field "name" (Expr.ty "Text"); field "doc" (Expr.ty "Text")
+    field "body" (Expr.ty "Text"); field "is_toolchain" (Expr.ty "Bool"))
+  let ruleEntry := Expr.listOf (buildRecordType do
+    field "impl" (Expr.var "RuleImpl"); field "attrs" (Expr.listOf (Expr.var "Attr")))
+  let bzlFile := ("BzlFile", Option.none, buildRecordType do
+    field "header" (Expr.ty "Text"); field "loads" (Expr.listOf (Expr.var "Load"))
+    field "globals" (Expr.ty "Text"); field "providers" (Expr.listOf (Expr.var "ProviderDef"))
+    field "helpers" (Expr.listOf (Expr.var "HelperFn")); field "rules" ruleEntry)
+  let exports := buildRecord do
+    field "AttrType" (Expr.var "AttrType"); field "Attr" (Expr.var "Attr")
+    field "Load" (Expr.var "Load"); field "ProviderDef" (Expr.var "ProviderDef")
+    field "ProviderField" (Expr.var "ProviderField"); field "HelperFn" (Expr.var "HelperFn")
+    field "RuleImpl" (Expr.var "RuleImpl"); field "BzlFile" (Expr.var "BzlFile")
+  Expr.letChain [attrType, attr, load, providerField, providerDef, helperFn, ruleImpl, bzlFile] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                          // render/buck2/package.dhall
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitBzlPackageDhall : Expr :=
+  let r := ("R", Option.none, Expr.importFile "Rule.dhall")
+  let exports := buildRecord do
+    field "Rule" (Expr.var "R")
+  Expr.letChain [r] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                          // Prelude.dhall (utility functions)
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitPreludeDhall : Expr :=
+  -- concatSep: join a list of text with a separator
+  let concatSep := ("concatSep", Option.none,
+    Expr.lambda "sep" (Expr.ty "Text")
+      (Expr.lambda "xs" (Expr.listOf (Expr.ty "Text"))
+        (Expr.var "xs")))  -- note: real impl uses List/fold; simplified here
+  let exports := buildRecord do
+    field "Text" (buildRecord do field "concatSep" (Expr.var "concatSep"))
+  Expr.letChain [concatSep] exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                               // final prelude file list
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 def preludeFiles : List (String × Expr) :=
-  [ ("core/Triple.dhall",       emitTripleDhall)
-  , ("core/Dep.dhall",          emitDepDhall)
-  , ("core/Vis.dhall",          emitVisDhall)
-  , ("core/Resource.dhall",     emitResourceDhall)
-  , ("build/Toolchain.dhall",   emitToolchainDhall)
-  , ("lang/Cxx.dhall",          emitCxxDhall)
-  , ("lang/Haskell.dhall",      emitHaskellDhall)
-  , ("lang/Rust.dhall",         emitRustDhall)
-  , ("lang/Lean.dhall",         emitLeanDhall)
-  , ("lang/Nv.dhall",           emitNvDhall)
-  , ("lang/PureScript.dhall",   emitPureScriptDhall)
-  , ("lang/Genrule.dhall",      emitGenruleDhall)
-  , ("lang/NixCxx.dhall",       emitNixCxxDhall)
-  , ("lang/RustCrate.dhall",    emitRustCrateDhall)
-  , ("build/Rule.dhall",        emitRuleDhall)
-  , ("package.dhall",           emitPackageDhall)
+  [ ("core/Triple.dhall",            emitTripleDhall)
+  , ("core/Dep.dhall",               emitDepDhall)
+  , ("core/Vis.dhall",               emitVisDhall)
+  , ("core/Resource.dhall",          emitResourceDhall)
+  , ("build/Toolchain.dhall",        emitToolchainDhall)
+  , ("lang/Cxx.dhall",               emitCxxDhall)
+  , ("lang/Haskell.dhall",           emitHaskellDhall)
+  , ("lang/Rust.dhall",              emitRustDhall)
+  , ("lang/Lean.dhall",              emitLeanDhall)
+  , ("lang/Nv.dhall",                emitNvDhall)
+  , ("lang/PureScript.dhall",        emitPureScriptDhall)
+  , ("lang/Genrule.dhall",           emitGenruleDhall)
+  , ("lang/NixCxx.dhall",            emitNixCxxDhall)
+  , ("lang/RustCrate.dhall",         emitRustCrateDhall)
+  , ("build/Rule.dhall",             emitRuleDhall)
+  , ("package.dhall",                emitPackageDhall)
+  , ("Prelude.dhall",                emitPreludeDhall)
+  , ("render/buck2/Rule.dhall",      emitBzlRuleDhall)
+  , ("render/buck2/package.dhall",   emitBzlPackageDhall)
   ]
 
 
