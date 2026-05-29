@@ -1,0 +1,7 @@
+load("@toolchains//:cuda.bzl", "cuda_binary")
+
+cuda_binary(
+    name = "hello-gpu",
+    srcs = ["hello.cu"],
+    gpu_archs = ["90"],  # SM 9.0 (Blackwell/Hopper). Adjust for your GPU.
+)

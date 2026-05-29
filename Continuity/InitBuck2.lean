@@ -111,13 +111,22 @@ def generateBuckconfig (tools : ToolPaths) : String :=
       s!"[haskell]\n  ghc = {ghc}{cabalLine}\n"
     | none => ""
 
+  let nv := match tools.nvcc with
+    | some nvcc =>
+      let cudaRoot := tools.cudaRoot.getD "/usr/local/cuda"
+      s!"[nv]
+  nvcc = {nvcc}
+  cuda_root = {cudaRoot}
+"
+    | none => ""
+
   let reapi := match tools.reapiEndpoint with
     | some ep =>
       let inst := tools.reapiInstance.getD "default"
       s!"[reapi]\n  endpoint = {ep}\n  instance_name = {inst}\n"
     | none => ""
 
-  base ++ lean ++ cxx ++ hs ++ reapi
+  base ++ lean ++ cxx ++ hs ++ nv ++ reapi
 
 def toolchainsBuck : String :=
   "load(\"@prelude//toolchains:demo.bzl\", \"system_demo_toolchains\")\nsystem_demo_toolchains()\n"
@@ -162,12 +171,19 @@ def initBuck2 (specPath targetDir : String) : IO Unit := do
   IO.FS.writeFile (targetDir ++ "/.buckconfig") (generateBuckconfig tools)
   IO.FS.writeFile (targetDir ++ "/toolchains/BUCK") toolchainsBuck
 
-  -- Copy lean.bzl from our own toolchains if lean is configured
+  -- Copy toolchain rules from our own toolchains if configured
   if tools.leanRoot.isSome then
     -- Try to read lean.bzl from adjacent to the binary
     let leanBzl ← IO.FS.readFile "toolchains/lean.bzl" <|>
                    pure "-- lean.bzl not found; copy from continuity/toolchains/lean.bzl\n"
     IO.FS.writeFile (targetDir ++ "/toolchains/lean.bzl") leanBzl
+
+  -- Copy cuda.bzl if NVIDIA is configured
+  if tools.nvcc.isSome then
+    let cudaBzl ← IO.FS.readFile "toolchains/cuda.bzl" <|>
+                   pure "-- cuda.bzl not found; copy from continuity/toolchains/cuda.bzl
+"
+    IO.FS.writeFile (targetDir ++ "/toolchains/cuda.bzl") cudaBzl
 
   -- .gitignore
   let gitignore := "buck-out\n.buckroot\n"
