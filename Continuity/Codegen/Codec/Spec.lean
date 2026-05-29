@@ -192,8 +192,132 @@ def evmModule : CodecModule where
     ], "164 bytes exactly"⟩
   ]
 
+def httpModule : CodecModule where
+  name := "Http"
+  namespace_ := "continuity::http"
+  doc := "HTTP/1.1 request/response format (RFC 7230)"
+  enums := [
+    ⟨"Method", [
+      ⟨"Get", 0, ""⟩, ⟨"Head", 1, ""⟩, ⟨"Post", 2, ""⟩, ⟨"Put", 3, ""⟩,
+      ⟨"Delete", 4, ""⟩, ⟨"Connect", 5, ""⟩, ⟨"Options", 6, ""⟩,
+      ⟨"Trace", 7, ""⟩, ⟨"Patch", 8, ""⟩
+    ], .u8, ""⟩,
+    ⟨"TransferEncoding", [
+      ⟨"Identity", 0, ""⟩, ⟨"Chunked", 1, ""⟩, ⟨"Gzip", 2, ""⟩,
+      ⟨"Deflate", 3, ""⟩, ⟨"Compress", 4, ""⟩
+    ], .u8, ""⟩
+  ]
+  structs := [
+    ⟨"Header", [⟨"name", .lenPrefixed, ""⟩, ⟨"value", .lenPrefixed, ""⟩], ""⟩,
+    ⟨"RequestLine", [
+      ⟨"method", .u8, ""⟩, ⟨"target", .lenPrefixed, ""⟩, ⟨"version", .lenPrefixed, ""⟩
+    ], ""⟩,
+    ⟨"StatusLine", [
+      ⟨"version", .lenPrefixed, ""⟩, ⟨"statusCode", .u16le, ""⟩,
+      ⟨"reasonPhrase", .lenPrefixed, ""⟩
+    ], ""⟩
+  ]
+
+def http3Module : CodecModule where
+  name := "Http3"
+  namespace_ := "continuity::http3"
+  doc := "HTTP/3 + QUIC + QPACK (RFC 9114, 9000, 9204)"
+  enums := [
+    ⟨"FrameType", [
+      ⟨"Data", 0x00, ""⟩, ⟨"Headers", 0x01, ""⟩, ⟨"CancelPush", 0x03, ""⟩,
+      ⟨"Settings", 0x04, ""⟩, ⟨"PushPromise", 0x05, ""⟩,
+      ⟨"Goaway", 0x07, ""⟩, ⟨"MaxPushId", 0x0D, ""⟩
+    ], .varint, "QUIC varint-encoded frame type"⟩
+  ]
+  structs := [
+    ⟨"QUICFrame", [
+      ⟨"frameType", .varint, ""⟩, ⟨"length", .varint, ""⟩, ⟨"payload", .lenPrefixed, ""⟩
+    ], ""⟩
+  ]
+
+def gitTransportModule : CodecModule where
+  name := "GitTransport"
+  namespace_ := "continuity::git_transport"
+  doc := "Git smart transport protocol (pkt-line framing)"
+  constants := [⟨"PKT_LINE_MAX_DATA", .u32le, 65516, ""⟩]
+  enums := [
+    ⟨"PktLineType", [
+      ⟨"Flush", 0, ""⟩, ⟨"Delim", 1, ""⟩, ⟨"ResponseEnd", 2, ""⟩, ⟨"Data", 3, ""⟩
+    ], .u8, ""⟩,
+    ⟨"SideBandChannel", [
+      ⟨"PackData", 1, ""⟩, ⟨"Progress", 2, ""⟩, ⟨"Error", 3, ""⟩
+    ], .u8, ""⟩,
+    ⟨"Capability", [
+      ⟨"MultiAck", 0, ""⟩, ⟨"MultiAckDetailed", 1, ""⟩, ⟨"NoDone", 2, ""⟩,
+      ⟨"ThinPack", 3, ""⟩, ⟨"SideBand", 4, ""⟩, ⟨"SideBand64k", 5, ""⟩,
+      ⟨"OfsDelta", 6, ""⟩, ⟨"Shallow", 7, ""⟩, ⟨"DeepenSince", 8, ""⟩,
+      ⟨"DeepenNot", 9, ""⟩, ⟨"NoProgress", 10, ""⟩, ⟨"IncludeTag", 11, ""⟩,
+      ⟨"ReportStatus", 12, ""⟩, ⟨"DeleteRefs", 13, ""⟩, ⟨"Quiet", 14, ""⟩,
+      ⟨"Filter", 15, ""⟩
+    ], .u8, ""⟩
+  ]
+
+def samlModule : CodecModule where
+  name := "Saml"
+  namespace_ := "continuity::saml"
+  doc := "SAML assertion scanner — wrapping attack prevention by construction"
+  structs := [
+    ⟨"SignedPayload", [
+      ⟨"signedBytes", .lenPrefixed, "Canonicalized SignedInfo"⟩,
+      ⟨"signatureValue", .lenPrefixed, ""⟩
+    ], ""⟩,
+    ⟨"UnverifiedAssertion", [
+      ⟨"issuer", .lenPrefixed, ""⟩, ⟨"nameId", .lenPrefixed, ""⟩,
+      ⟨"conditions", .lenPrefixed, "optional"⟩,
+      ⟨"signedPayload", .lenPrefixed, "SignedPayload"⟩
+    ], ""⟩,
+    ⟨"VerifiedAssertion", [
+      ⟨"issuer", .lenPrefixed, ""⟩, ⟨"nameId", .lenPrefixed, ""⟩,
+      ⟨"conditions", .lenPrefixed, ""⟩
+    ], "Can only be constructed via verify()"⟩
+  ]
+
+def jsonModule : CodecModule where
+  name := "Json"
+  namespace_ := "continuity::json"
+  doc := "JSON value type and recursive descent parser"
+  enums := [
+    ⟨"ValueType", [
+      ⟨"Null", 0, ""⟩, ⟨"Bool", 1, ""⟩, ⟨"Number", 2, ""⟩,
+      ⟨"String", 3, ""⟩, ⟨"Array", 4, ""⟩, ⟨"Object", 5, ""⟩
+    ], .u8, ""⟩
+  ]
+
+def stateMachineModule : CodecModule where
+  name := "StateMachine"
+  namespace_ := "continuity::state_machine"
+  doc := "Protocol state machine DSL — deterministic by construction"
+  enums := [
+    ⟨"HandshakeState", [
+      ⟨"Initial", 0, ""⟩, ⟨"ClientHello", 1, ""⟩, ⟨"ServerHello", 2, ""⟩,
+      ⟨"ServerParams", 3, ""⟩, ⟨"ServerFinished", 4, ""⟩,
+      ⟨"ClientFinished", 5, ""⟩, ⟨"Established", 6, ""⟩, ⟨"Failed", 7, ""⟩
+    ], .u8, "TLS-style handshake states"⟩,
+    ⟨"ConnState", [
+      ⟨"Disconnected", 0, ""⟩, ⟨"Connecting", 1, ""⟩, ⟨"Handshaking", 2, ""⟩,
+      ⟨"Established", 3, ""⟩, ⟨"Draining", 4, ""⟩,
+      ⟨"Closed", 5, ""⟩, ⟨"Failed", 6, ""⟩
+    ], .u8, "Generic connection lifecycle"⟩
+  ]
+
+def varintModule : CodecModule where
+  name := "Varint"
+  namespace_ := "continuity::varint"
+  doc := "Protobuf-style variable-length integer encoding (proven roundtrip)"
+  structs := [
+    ⟨"Varint", [⟨"value", .u64le, "Decoded value"⟩], "1-10 bytes on wire"⟩
+  ]
+
 /-- All protocol modules for codegen. -/
 def allModules : List CodecModule :=
-  [nixModule, protobufModule, gitModule, http2Module, zmtpModule, evmModule]
+  [ nixModule, protobufModule, gitModule, gitTransportModule
+  , httpModule, http2Module, http3Module
+  , zmtpModule, samlModule, evmModule
+  , jsonModule, stateMachineModule, varintModule ]
 
 end Continuity.Codegen.Codec

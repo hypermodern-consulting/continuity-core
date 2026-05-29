@@ -20,11 +20,13 @@ private def wireTypeToCType : WireType → CType
   | .padded _ => CType.template "std::vector" [CType.intType true 8]
 
 private def snakeCase (s : String) : String :=
-  s.foldl (fun (acc : String) c =>
+  let (result, _) := s.foldl (fun ((acc, prevLower) : String × Bool) c =>
     if c.isUpper then
-      (if acc.isEmpty then acc else acc ++ "_") ++ s!"{c.toLower}"
-    else acc.push c
-  ) ""
+      let withSep := if prevLower then acc ++ "_" else acc
+      (withSep ++ s!"{c.toLower}", false)
+    else (acc.push c, c.isLower)
+  ) ("", false)
+  result
 
 private partial def hexStr (n : Nat) : String :=
   if n == 0 then "0x0"
