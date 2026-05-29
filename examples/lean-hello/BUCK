@@ -1,0 +1,12 @@
+load("@toolchains//:lean.bzl", "lean_library", "lean_binary")
+
+lean_library(
+    name = "mylib",
+    srcs = ["MyLib/Hello.lean"],
+)
+
+lean_binary(
+    name = "hello",
+    srcs = ["MyLib/Main.lean"],
+    deps = [":mylib"],
+)
