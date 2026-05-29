@@ -538,17 +538,40 @@ def emitHaskellDhall : Expr :=
             field "modules"  emptyTextList
             field "ghcFlags" emptyTextList
             field "vis"      visDflt))))
+  let ffiBinaryType := ("FFIBinary", Option.none, buildRecordType do
+    field "name"     (Expr.ty "Text")
+    field "srcs"     textListTy
+    field "cSrcs"    textListTy
+    field "deps"     depListTy
+    field "main"     (Expr.ty "Text")
+    field "ghcFlags" textListTy
+    field "cFlags"   textListTy
+    field "ldFlags"  textListTy
+    field "vis"      visTy)
+  let ffiBinaryFn := ("ffiBinary", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "srcs" textListTy
+        (Expr.lambda "cSrcs" textListTy
+          (Expr.lambda "deps" depListTy
+            (buildRecord do
+              field "name"     (Expr.var "name")
+              field "srcs"     (Expr.var "srcs")
+              field "cSrcs"    (Expr.var "cSrcs")
+              field "deps"     (Expr.var "deps")
+              field "main"     (Expr.str "Main")
+              field "ghcFlags" emptyTextList
+              field "cFlags"   emptyTextList
+              field "ldFlags"  emptyTextList
+              field "vis"      visDflt)))))
   let exports := buildRecord do
-    field "Binary"  (Expr.var "Binary")
-    field "binary"  (Expr.var "binary")
-    field "Library" (Expr.var "Library")
-    field "library" (Expr.var "library")
-  Expr.letChain [d, v, binaryType, binaryFn, libraryType, libraryFn] exports
-
-
-
-
-/- ════════════════════════════════════════════════════════════════════════════════
+    field "Binary"     (Expr.var "Binary")
+    field "binary"     (Expr.var "binary")
+    field "Library"    (Expr.var "Library")
+    field "library"    (Expr.var "library")
+    field "FFIBinary"  (Expr.var "FFIBinary")
+    field "ffiBinary"  (Expr.var "ffiBinary")
+  Expr.letChain [d, v, binaryType, binaryFn, libraryType, libraryFn,
+                 ffiBinaryType, ffiBinaryFn] exports/- ════════════════════════════════════════════════════════════════════════════════
                                                    // Rust.dhall module
    ════════════════════════════════════════════════════════════════════════════════ -/
 
@@ -927,6 +950,7 @@ def emitRuleDhall : Expr :=
     ("RustLibrary",       Option.some (Expr.field (Expr.var "R") "Library")),
     ("HaskellBinary",     Option.some (Expr.field (Expr.var "H") "Binary")),
     ("HaskellLibrary",    Option.some (Expr.field (Expr.var "H") "Library")),
+    ("HaskellFFIBinary",  Option.some (Expr.field (Expr.var "H") "FFIBinary")),
     ("LeanBinary",        Option.some (Expr.field (Expr.var "L") "Binary")),
     ("LeanLibrary",       Option.some (Expr.field (Expr.var "L") "Library")),
     ("NvBinary",          Option.some (Expr.field (Expr.var "N") "Binary")),
@@ -948,6 +972,7 @@ def emitRuleDhall : Expr :=
     field "rustLibrary"       (Expr.var "Rule.RustLibrary")
     field "haskellBinary"     (Expr.var "Rule.HaskellBinary")
     field "haskellLibrary"    (Expr.var "Rule.HaskellLibrary")
+    field "haskellFFIBinary"  (Expr.var "Rule.HaskellFFIBinary")
     field "leanBinary"        (Expr.var "Rule.LeanBinary")
     field "leanLibrary"       (Expr.var "Rule.LeanLibrary")
     field "nvBinary"          (Expr.var "Rule.NvBinary")
