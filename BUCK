@@ -3,7 +3,6 @@ load("@toolchains//:lean.bzl", "lean_library", "lean_binary")
 lean_library(
     name = "continuity-lib",
     srcs = [
-        # Emit (no internal deps)
         "Continuity/Emit/Dhall/Ast.lean",
         "Continuity/Emit/Dhall/Render.lean",
         "Continuity/Emit/Dhall/Build.lean",
@@ -13,13 +12,28 @@ lean_library(
         "Continuity/Emit/Cpp/Ast.lean",
         "Continuity/Emit/Cpp/Render.lean",
         "Continuity/Emit/Cpp/Build.lean",
-        # Codec
         "Continuity/Codec/Box.lean",
         "Continuity/Codec/Scanner.lean",
         "Continuity/Codec/Parser.lean",
+        "Continuity/Codec/Bytes.lean",
+        "Continuity/Codec/Guards.lean",
+        "Continuity/Codec/Varint.lean",
+        "Continuity/Codec/Protocol.lean",
+        "Continuity/Codec/Limits.lean",
+        "Continuity/Codec/Nix.lean",
+        "Continuity/Codec/Protobuf.lean",
+        "Continuity/Codec/Git.lean",
+        "Continuity/Codec/GitTransport.lean",
+        "Continuity/Codec/Http.lean",
+        "Continuity/Codec/Http2.lean",
+        "Continuity/Codec/Http3.lean",
+        "Continuity/Codec/Zmtp.lean",
+        "Continuity/Codec/Saml.lean",
+        "Continuity/Codec/EVM.lean",
+        "Continuity/Codec/Json.lean",
+        "Continuity/Codec/StateMachine.lean",
         "Continuity/Codec/Dhall/Lexer.lean",
         "Continuity/Codec/Dhall/Parser.lean",
-        # Build (leaves first)
         "Continuity/Build/Triple.lean",
         "Continuity/Build/Dep.lean",
         "Continuity/Build/Vis.lean",
@@ -36,8 +50,10 @@ lean_library(
         "Continuity/Build/Genrule.lean",
         "Continuity/Build/Rule.lean",
         "Continuity/Build/BzlFile.lean",
-        # Codegen (depends on Emit + Build)
         "Continuity/Codegen/Build/ToDhall.lean",
+        "Continuity/Codegen/Codec/Spec.lean",
+        "Continuity/Codegen/Codec/ToCpp.lean",
+        "Continuity/Codegen/Codec/ToHaskell.lean",
     ],
     deps = [],
 )
