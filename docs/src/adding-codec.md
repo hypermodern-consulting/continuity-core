@@ -57,9 +57,10 @@ Add it to `allModules`.
 ### 5. Build and test
 
 ```bash
-./dev all           # Must compile with zero sorry
-gcc -O2 ...         # Run C property tests
-ghc -O ...          # Run Haskell property tests
+lake build                     # bootstrap
+buck2 build //:continuity      # must compile with zero sorry
+gcc -O2 ...                    # run C property tests
+ghc -O ...                     # run Haskell property tests
 ```
 
 ## Guidelines

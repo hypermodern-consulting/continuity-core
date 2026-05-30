@@ -23,16 +23,22 @@ without serialization proof, use `Parser`.
 ## Build
 
 ```bash
-# Development (uses lake for the bootstrap, buck2 for everything else)
-./dev all          # lake build → generate → render → buck2 build
+# Bootstrap (one time)
+lake build
 
-# Individual steps
-./dev generate     # lake build + emit Dhall/C++/Haskell prelude
-./dev render       # write BUCK/.buckconfig
-./dev build        # buck2 build //:continuity
-./dev run [args]   # run the continuity binary
-./dev tarball      # package for export
-./dev clean        # remove all build artifacts
+# Generate Dhall/C++/Haskell prelude
+lake exe continuity output/continuity-prelude
+
+# Buck2 build
+buck2 build //:continuity
+```
+
+Or via Nix:
+
+```bash
+nix build .#                         # build continuity binary
+nix build .#continuity-generated     # all generated Dhall/C++/Haskell sources
+nix flake check                      # run all checks
 ```
 
 ## Adding a Codec
@@ -43,7 +49,7 @@ without serialization proof, use `Parser`.
 4. Add the import to `Continuity.lean` (root module)
 5. Add the file to `BUCK` source list (explicit dep order)
 6. Add a `CodecModule` to `Codegen/Codec/Spec.lean` for C++/Haskell generation
-7. Run `./dev all` — it must compile with zero sorry
+7. Run `lake build && buck2 build //:continuity` — it must compile with zero sorry
 
 Example — adding a new wire type:
 

@@ -23,3 +23,11 @@ result-*
 .DS_Store
 buck-out/
 .lake/
+
+# Generated
+.continuity-prelude/
+output/
+
+# Haskell build artifacts
+*.hi
+*.o
