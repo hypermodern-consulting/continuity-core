@@ -78,6 +78,8 @@ def _cuda_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     script_parts = ["set -e", "mkdir -p $OBJ_DIR"]
 
     nvcc_flags = ["-c", "--compiler-options", "'-fPIC'"]
+    if cuda_root:
+        nvcc_flags.extend(["-I", cuda_root + "/include"])
     for arch in ctx.attrs.gpu_archs:
         nvcc_flags.extend(["-gencode", "arch=compute_{0},code=sm_{0}".format(arch)])
 
@@ -99,6 +101,7 @@ def _cuda_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     # Link
     link_flags = ["-lcudart"]
     if cuda_root:
+        link_flags.extend(["-L", cuda_root + "/lib"])
         link_flags.extend(["-L", cuda_root + "/lib64"])
     for flag in ctx.attrs.link_flags:
         link_flags.append(flag)

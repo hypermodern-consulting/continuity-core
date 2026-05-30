@@ -51,6 +51,9 @@
           ...
         }:
         let
+          # ── CUDA toolchain (unfree) ──
+          # Requires nixpkgs.config.allowUnfree = true in the flake config
+          cuda = pkgs.cudaPackages;
           # ── Extract leantar binary from release tarball ──
           # Lean's cmake tries to download this at build time. We pre-fetch it.
           leantar-bin = pkgs.runCommand "leantar" { } ''
@@ -315,18 +318,25 @@
               buildifier.enable = true;
               dhall.enable = true;
             };
+
             settings = {
               formatter = {
                 clang-format.includes = [
                   "*.c"
                   "*.h"
                   "*.hpp"
+                  "*.cpp"
+                  "*.cc"
+                  "*.cxx"
                 ];
+
                 fourmolu.includes = [ "*.hs" ];
+
                 buildifier.includes = [
                   "*.bzl"
                   "BUCK"
                 ];
+
                 dhall.includes = [ "*.dhall" ];
               };
             };
@@ -345,6 +355,8 @@
               gh
               gnumake
               python3
+              cuda.cuda_nvcc
+              cuda.cuda_cudart
             ];
             shellHook = ''
               echo "continuity — verified metaprogramming"

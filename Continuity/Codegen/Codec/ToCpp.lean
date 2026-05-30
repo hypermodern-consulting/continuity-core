@@ -68,7 +68,7 @@ private def serializeFnDecl (s : StructSpec) : CDecl :=
     [CStmt.comment "Generated stub — implementation links to verified Lean",
      CStmt.ret (CExpr.initList [])]
 
-def moduleToHpp (m : CodecModule) : CFile :=
+def moduleToH (m : CodecModule) : CFile :=
   let includes := [
     CDecl.pragmaOnce,
     CDecl.includeSystem "cstdint",
@@ -95,7 +95,7 @@ def moduleToHpp (m : CodecModule) : CFile :=
 
 def cppCodecFiles : List (String × String) :=
   allModules.map fun m =>
-    let file := moduleToHpp m
-    (s!"codec/{snakeCase m.name}.hpp", renderFile file)
+    let file := moduleToH m
+    (s!"codec/{snakeCase m.name}.h", renderFile file)
 
 end Continuity.Codegen.Codec

@@ -25,6 +25,7 @@ def _get_lean_lib_dir():
 def _lean_library_impl(ctx: AnalysisContext) -> list[Provider]:
     lean = _get_lean()
     lean_lib_dir = _get_lean_lib_dir()
+    cadical_dir = read_root_config("lean", "cadical_dir", "")
 
     olean_dir = ctx.actions.declare_output("olean", dir = True)
     c_dir = ctx.actions.declare_output("c", dir = True)
@@ -42,6 +43,8 @@ def _lean_library_impl(ctx: AnalysisContext) -> list[Provider]:
 
     script_parts = ["set -e"]
     script_parts.append("mkdir -p $OLEAN_DIR $C_DIR")
+    if cadical_dir:
+        script_parts.append("export PATH={}:$PATH".format(cadical_dir))
     script_parts.append(cmd_args(
         "export LEAN_PATH=",
         cmd_args(lean_path_parts, delimiter = ":"),
@@ -113,6 +116,7 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     lean = _get_lean()
     leanc = _get_leanc()
     lean_lib_dir = _get_lean_lib_dir()
+    cadical_dir = read_root_config("lean", "cadical_dir", "")
 
     exe = ctx.actions.declare_output(ctx.attrs.name)
     olean_dir = ctx.actions.declare_output("olean", dir = True)
@@ -137,6 +141,8 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
 
     script_parts = ["set -e"]
     script_parts.append("mkdir -p $OLEAN_DIR $C_DIR")
+    if cadical_dir:
+        script_parts.append("export PATH={}:$PATH".format(cadical_dir))
     script_parts.append(cmd_args(
         "export LEAN_PATH=",
         cmd_args(lean_path_parts, delimiter = ":"),

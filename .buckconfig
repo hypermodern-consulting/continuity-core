@@ -17,7 +17,11 @@
 [build]
   execution_platforms = prelude//platforms:default
 [lean]
-  lean = /root/.elan/toolchains/leanprover--lean4---v4.30.0/bin/lean
-  leanc = /root/.elan/toolchains/leanprover--lean4---v4.30.0/bin/leanc
-  lean_lib_dir = /root/.elan/toolchains/leanprover--lean4---v4.30.0/lib/lean
-  lean_include_dir = /root/.elan/toolchains/leanprover--lean4---v4.30.0/include
+  lean = /nix/store/4qdxwwh5gy3xdsk9yn7hgh0rhpwxskvw-lean4-4.30.0/bin/lean
+  leanc = /nix/store/4qdxwwh5gy3xdsk9yn7hgh0rhpwxskvw-lean4-4.30.0/bin/leanc
+  lean_lib_dir = /nix/store/4qdxwwh5gy3xdsk9yn7hgh0rhpwxskvw-lean4-4.30.0/lib/lean
+  lean_include_dir = /nix/store/4qdxwwh5gy3xdsk9yn7hgh0rhpwxskvw-lean4-4.30.0/include
+  cadical_dir = /nix/store/l023iq6hzmdj9yjxxcfh7ix4hm4wbjbg-cadical-3.0.0/bin
+[nv]
+  nvcc = /nix/store/50fi3x00m5ksrpcmc4pbkh57h9dhl8ls-cuda12.9-cuda_nvcc-12.9.86/bin/nvcc
+  cuda_root = /nix/store/98hg0wzq5xpk2wax4ihiykk8mc9slnja-cuda12.9-cuda_cudart-12.9.79

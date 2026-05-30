@@ -6,7 +6,7 @@
 #include <cstring>
 #include <random>
 
-#include "codec_runtime.hpp"
+#include "codec_runtime.h"
 
 using namespace continuity;
 

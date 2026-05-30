@@ -104,7 +104,7 @@ examples/
 test/
   codec_test.c                  326K C property tests
   CodecTest.hs                  15K Haskell property tests
-  codec_runtime.hpp             C++ wire format primitives
+  codec_runtime.h               C++ wire format primitives
 ```
 
 ## Numbers
