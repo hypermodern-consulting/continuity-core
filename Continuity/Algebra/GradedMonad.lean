@@ -3,7 +3,8 @@ import Continuity.Algebra.Grade
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                        // continuity // algebra // gradedmonad
+                                         // continuity // algebra // gradedmonad
+                                                                gradedmonad.lean
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-!
@@ -32,9 +33,9 @@ open Continuity.Algebra.Grade
 open Grade (unit full plus subset mem isPure isReproducible)
 
 
-/- ═══════════════════════════════════════════════════════════════════════════
-                                                            // opaque // monad
-   ═══════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                               // opaque monad
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 opaque GradedM (g : Grade) (α : Type) : Type
 @[instance] axiom GradedM.instInhabited {g : Grade} : Inhabited (GradedM g Unit)
@@ -46,9 +47,9 @@ axiom gmap {α β : Type} {g : Grade} : (α → β) → GradedM g α → GradedM
 axiom gsub {α : Type} {g₁ g₂ : Grade} : subset g₁ g₂ → GradedM g₁ α → GradedM g₂ α
 
 
-/- ══════════════════════════════════════════════════════════════════════════
-                                                      // effect // primitives
-   ══════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                         // effect primitives
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 axiom netRequest {α : Type} : String → GradedM [Label.Net] α
 axiom readAuth : String → GradedM [Label.Auth] String
@@ -60,9 +61,9 @@ axiom getRandom : Nat → GradedM [Label.Random] (List UInt8)
 axiom cryptoOp {α : Type} : String → GradedM [Label.Crypto] α
 
 
-/- ═══════════════════════════════════════════════════════════════════════════
-                                                           // domain // grades
-   ═══════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                              // domain grades
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 def gradeSSPHandshake : Grade := [Label.Net, Label.Crypto]
 def gradeSSPAuth : Grade := [Label.Net, Label.Crypto, Label.Auth]

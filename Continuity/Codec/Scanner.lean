@@ -2,6 +2,7 @@ import Continuity.Codec.Box
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                               // continuity // codec // scanner
+                                                                   scanner.lean
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-!
@@ -27,9 +28,9 @@ namespace Continuity.Codec
 open Continuity.Codec
 
 
-/- ════════════════════════════════════════════════════════════════════════════
-                                                              // scan // result
-   ════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                               // scan result
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 /-- Result of scanning bytes for a delimiter. -/
 inductive ScanResult (α : Type) where
@@ -71,9 +72,9 @@ def toOption {α : Type} : ScanResult α → Option (α × Bytes)
 end ScanResult
 
 
-/- ════════════════════════════════════════════════════════════════════════════
-                                                                     // scanner
-   ════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                                   // scanner
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 /-- A Scanner finds delimited content in a byte stream.
 
@@ -90,9 +91,9 @@ structure Scanner (α : Type) where
   deriving Inhabited
 
 
-/- ════════════════════════════════════════════════════════════════════════════
-                                                     // byte-finding primitives
-   ════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                      // byte-finding primitives
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 /-- Find index of first occurrence of a byte.
     Explicit fuel-based recursion for proof induction on content.size. -/
@@ -122,9 +123,9 @@ def findBytes (needle : Bytes) (haystack : Bytes) : Option Nat :=
     go 0 limit
 
 
-/- ════════════════════════════════════════════════════════════════════════════
-                                                           // findByte theorems
-   ════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                          // findByte theorems
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 /-! these lemmas establish that findByte correctly locates the first
     occurrence of a delimiter. the key theorem `findByte_append_delim`
@@ -290,9 +291,9 @@ def scanAlphaNum : Scanner Bytes := scanWhile isAlphaNum
 def scanWhitespace : Scanner Bytes := scanWhile isWhitespace
 
 
-/- ════════════════════════════════════════════════════════════════════════════
-                                                      // exact // match scanner
-   ════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                         // exact match scanner
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 /-- Match exact bytes at the start of input. -/
 def exact (expected : Bytes) : Scanner Unit where
@@ -308,9 +309,9 @@ def exact (expected : Bytes) : Scanner Unit where
 def exactByte (expected : UInt8) : Scanner Unit := exact ⟨#[expected]⟩
 
 
-/- ════════════════════════════════════════════════════════════════════════════
-                                              // skip // consume // return unit
-   ════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                        // skip (consume, return Unit)
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 /-- Skip whitespace (returns Unit for chaining). -/
 def skipWhitespace : Scanner Unit where
@@ -324,9 +325,9 @@ def skipWhitespace : Scanner Unit where
   consumption := fun _ _ _ => trivial
 
 
-/- ════════════════════════════════════════════════════════════════════════════
-                                                                // combinators
-   ════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                              // combinators
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 def Scanner.map {α β : Type} (s : Scanner α) (f : α → β) : Scanner β where
   scan bs := s.scan bs |>.map f
@@ -404,9 +405,9 @@ def Scanner.sepBy {α : Type} (item : Scanner α) (delim : Scanner Unit) : Scann
   consumption := fun _ _ _ => trivial
 
 
-/- ════════════════════════════════════════════════════════════════════════════
-                                                  // box → scanner // embedding
-   ════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                     // box → scanner embedding
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 /-- Lift a Box into a Scanner. Box is strictly less powerful — this is always safe. -/
 def Scanner.fromBox {α : Type} (box : Box α) : Scanner α where
@@ -429,9 +430,9 @@ def Scanner.boxThen {α β : Type} (box : Box α) (next : α → Scanner β) : S
   consumption := fun _ _ _ => trivial
 
 
-/- ════════════════════════════════════════════════════════════════════════════
-                                                        // string // conversion
-   ════════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                      // string conversion
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 /-- Convert scanned bytes to String (UTF-8). Fails on invalid encoding. -/
 def Scanner.asString (s : Scanner Bytes) : Scanner String where
@@ -446,9 +447,9 @@ def Scanner.asString (s : Scanner Bytes) : Scanner String where
   consumption := fun _ _ _ => trivial
 
 
-/- ═══════════════════════════════════════════════════════════════════════════
-                                                       // common // delimiters
-   ═══════════════════════════════════════════════════════════════════════════ -/
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                          // common delimiters
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 def LF    : UInt8 := 0x0A
 def CR    : UInt8 := 0x0D
@@ -466,9 +467,9 @@ def scanLineStr    : Scanner String := scanLine.asString
 def scanCRLFLineStr : Scanner String := scanCRLFLine.asString
 
 
-/- ════════════════════════════════════════════════════════════════════════════
+/- ════════════════════════════════════════════════════════════════════════════════
                                                                        // tests
-   ════════════════════════════════════════════════════════════════════════════ -/
+   ════════════════════════════════════════════════════════════════════════════════ -/
 
 -- scan until newline
 #eval (scanLine.scan ("hello\nworld".toUTF8)).toOption.map (fun (a,_) => String.fromUTF8! a)

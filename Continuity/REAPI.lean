@@ -1,5 +1,6 @@
 import Continuity.CAS
 import Continuity.Derivation
+import Continuity.Derivation
 import Continuity.Build.Action
 import Continuity.Build.Command
 
@@ -24,6 +25,7 @@ set_option autoImplicit false
 namespace Continuity.REAPI
 
 open Continuity.CAS
+open Continuity.Derivation (writeLP writeLPStr writeLPList writeLPStrList)
 open Continuity.Derivation
 open Continuity.Build
 
@@ -80,22 +82,24 @@ structure ActionResult where
 
 /-- Serialize a Command deterministically for hashing. -/
 def serializeCommand (cmd : Command) : ByteArray :=
-  let parts : List String :=
-    cmd.arguments ++
-    cmd.environmentVariables.map (fun (k, v) => k ++ "=" ++ v) ++
-    cmd.outputFiles ++
-    cmd.outputDirectories ++
-    [cmd.workingDirectory]
-  (String.intercalate "\x00" parts).toUTF8
+  let buf := ByteArray.empty
+  let buf := writeLPStrList buf cmd.arguments
+  let buf := writeLPList buf (cmd.environmentVariables.map fun (k, v) =>
+    writeLPStr (writeLPStr ByteArray.empty k) v)
+  let buf := writeLPStrList buf cmd.outputFiles
+  let buf := writeLPStrList buf cmd.outputDirectories
+  writeLPStr buf cmd.workingDirectory
 
 /-- Serialize a Directory deterministically for hashing. -/
 def serializeDirectory (dir : Directory) : ByteArray :=
-  let fileParts := dir.files.map fun f =>
-    f.name ++ ":" ++ Continuity.Crypto.SHA256.toHex f.digest.hash.bytes ++
-    (if f.isExecutable then ":x" else "")
-  let dirParts := dir.directories.map fun d =>
-    d.name ++ ":" ++ Continuity.Crypto.SHA256.toHex d.digest.hash.bytes
-  (String.intercalate "\x00" (fileParts ++ dirParts)).toUTF8
+  let buf := ByteArray.empty
+  let buf := writeLPList buf (dir.files.map fun f =>
+    let b := writeLPStr ByteArray.empty f.name
+    let b := writeLP b f.digest.hash.bytes
+    b ++ ByteArray.mk #[if f.isExecutable then 1 else 0])
+  writeLPList buf (dir.directories.map fun d =>
+    let b := writeLPStr ByteArray.empty d.name
+    writeLP b d.digest.hash.bytes)
 
 
 /- ════════════════════════════════════════════════════════════════════════════════

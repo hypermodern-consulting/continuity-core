@@ -12,7 +12,7 @@
     CStmt — statements (expressions have no semicolons; statements do)
     CDecl — top-level declarations: includes, structs, functions, namespaces
 
-  These assemble into CFile, which is a complete .h or .cpp file.
+  These assemble into CFile, which is a complete .hpp or .cpp file.
 
   We model the subset of C++ that appears in codec codegen: structs with
   fields, pack/unpack functions using memcpy and span, size checks, offset
@@ -196,7 +196,7 @@ inductive CDecl where
   | pragmaOnce
   /-- `#include <cstdint>` -/
   | includeSystem (header : String)
-  /-- `#include "foo.h"` -/
+  /-- `#include "foo.hpp"` -/
   | includeLocal (header : String)
   /-- forward declaration: `struct NixString;` -/
   | forwardDecl (name : String)

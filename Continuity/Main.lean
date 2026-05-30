@@ -1,7 +1,9 @@
+import Continuity.Derivation
 import Continuity.Codegen.Build.ToDhall
 import Continuity.Codegen.Codec.ToCpp
 import Continuity.Codegen.Codec.ToHaskell
 import Continuity.InitBuck2
+import Continuity.Codegen.Effect
 import Continuity.Crypto.SHA256
 
 open Continuity.Codegen.Build
@@ -31,17 +33,34 @@ def cmdGenerate (outDir : String) : IO Unit := do
     IO.println s!"  wrote {path}"
   let total := preludeFiles.length + cppCodecFiles.length + hsCodecFiles.length
 
+  -- Grade module (Haskell + C++)
+  let gradeHsPath := s!"{outDir}/grade/Continuity/Grade.hs"
+  let gradeHsDir := System.FilePath.mk gradeHsPath |>.parent |>.getD (System.FilePath.mk ".")
+  IO.FS.createDirAll gradeHsDir
+  IO.FS.writeFile gradeHsPath Continuity.Codegen.Effect.emitGradeModule
+  IO.println s!"  wrote grade/Continuity/Grade.hs"
+
+  let gradeCppPath := s!"{outDir}/grade/continuity_grade.hpp"
+  let gradeCppDir := System.FilePath.mk gradeCppPath |>.parent |>.getD (System.FilePath.mk ".")
+  IO.FS.createDirAll gradeCppDir
+  IO.FS.writeFile gradeCppPath Continuity.Codegen.Effect.emitCppGradeEnum
+  IO.println s!"  wrote grade/continuity_grade.hpp"
+
   -- Reflective hash prediction (§5 of the paper):
   -- Compute h1 = SHA-256(concatenated output) using the verified Lean implementation.
   -- This is the prediction. The build system can verify the files on disk match.
+  -- LP-frame each entry: LP(path) ++ LP(content) for unambiguous hashing
   let mut manifest := ByteArray.empty
   for (path, expr) in preludeFiles do
     let content := render expr ++ "\n"
-    manifest := manifest ++ path.toUTF8 ++ content.toUTF8
+    manifest := Continuity.Derivation.writeLPStr manifest path
+    manifest := Continuity.Derivation.writeLPStr manifest content
   for (path, content) in cppCodecFiles do
-    manifest := manifest ++ path.toUTF8 ++ content.toUTF8
+    manifest := Continuity.Derivation.writeLPStr manifest path
+    manifest := Continuity.Derivation.writeLPStr manifest content
   for (path, content) in hsCodecFiles do
-    manifest := manifest ++ path.toUTF8 ++ content.toUTF8
+    manifest := Continuity.Derivation.writeLPStr manifest path
+    manifest := Continuity.Derivation.writeLPStr manifest content
 
   let h1 := Continuity.Crypto.SHA256.hashHex manifest
   IO.FS.writeFile (outDir ++ "/MANIFEST.sha256") (h1 ++ "\n")

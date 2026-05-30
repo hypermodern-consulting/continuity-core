@@ -5,7 +5,7 @@ __global__ void hello_kernel() {
            threadIdx.x, blockIdx.x);
 }
 
-int main(int argc, char* argv) {
+int main(void) {
     int deviceCount = 0;
     cudaError_t err = cudaGetDeviceCount(&deviceCount);
 

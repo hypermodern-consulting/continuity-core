@@ -31,11 +31,9 @@ decodeVarint bs = go 0 0 0
 main :: IO ()
 main = do
     putStrLn "Haskell varint roundtrip tests:"
-
     let values = [0, 1, 127, 128, 16383, 300, 0xFFFFFFFF, maxBound :: Word64]
     let results = map test values
     let passed = length (filter id results)
-
     putStrLn $ "  " ++ show passed ++ "/" ++ show (length values) ++ " passed"
   where
     test v = case decodeVarint (encodeVarint v) of

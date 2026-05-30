@@ -14,7 +14,7 @@ import Continuity.Emit.Cpp.Ast
     renderStmt — statements (semicolons, braces, indentation)
     renderDecl — top-level declarations
 
-  renderFile assembles a complete .h with pragma-once and header comment.
+  renderFile assembles a complete .hpp with pragma-once and header comment.
 -/
 
 namespace Continuity.Emit.Cpp
