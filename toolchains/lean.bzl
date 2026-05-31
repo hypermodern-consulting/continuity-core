@@ -83,9 +83,8 @@ def _lean_library_impl(ctx: AnalysisContext) -> list[Provider]:
         lean_path_parts.append(cmd_args(dep_path))
     script_parts.append(cmd_args("export LEAN_PATH=", cmd_args(lean_path_parts, delimiter = ":"), delimiter = ""))
 
-    # Compile each source
+    # Compile each source (srcs must be in dependency order)
     for src in ctx.attrs.srcs:
-        # Preserve directory structure for hierarchical modules
         src_path = src.short_path
         olean_path = src_path.removesuffix(".lean") + ".olean"
         script_parts.append(cmd_args("mkdir -p $(dirname $BUCK_SCRATCH_PATH/", src_path, ")", delimiter = ""))

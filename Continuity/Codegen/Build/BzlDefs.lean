@@ -290,10 +290,9 @@ private def leanLibraryBody : List SStmt :=
       ] [("delimiter", .str "")]
     ] [])
   , .blank
-  , .comment "Compile each source"
+  , .comment "Compile each source (srcs must be in dependency order)"
   , .forStmt "src" (SExpr.ctxAttr "srcs") [
-      .comment "Preserve directory structure for hierarchical modules"
-    , .assign "src_path" (.dot (.var "src") "short_path")
+      .assign "src_path" (.dot (.var "src") "short_path")
     , .assign "olean_path" (.binop "+"
         (.methodCall (.var "src_path") "removesuffix" [.str ".lean"] [])
         (.str ".olean"))
