@@ -207,9 +207,10 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     link_cmd.extend(ctx.attrs.link_flags)
     for c_file in c_files:
         link_cmd.append(c_file)
-    # Add dependency library C files
+    # Add dependency library C files via find (cmd_args quotes globs)
     for dep_c_dir in dep_c_dirs:
-        link_cmd.append(cmd_args(dep_c_dir, "/*.c", delimiter = ""))
+        script_parts.append(cmd_args("DEP_C=\"$(find ", dep_c_dir, " -name '*.c')\"", delimiter = ""))
+    link_cmd.append("$DEP_C")
     script_parts.append(cmd_args(link_cmd, delimiter = " "))
 
     script = cmd_args(script_parts, delimiter = "\n")

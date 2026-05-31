@@ -483,12 +483,14 @@ private def leanBinaryBody : List SStmt :=
   , .forStmt "c_file" (.var "c_files") [
       .expr (.methodCall (.var "link_cmd") "append" [.var "c_file"] [])
     ]
-  , .comment "Add dependency library C files"
+  , .comment "Add dependency library C files via find (cmd_args quotes globs)"
   , .forStmt "dep_c_dir" (.var "dep_c_dirs") [
-      .expr (.methodCall (.var "link_cmd") "append"
-        [.call (.var "cmd_args") [.var "dep_c_dir", .str "/*.c"]
+      .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [
+          .str "DEP_C=\"$(find ", .var "dep_c_dir", .str " -name '*.c')\""]
           [("delimiter", .str "")]] [])
     ]
+  , .expr (.methodCall (.var "link_cmd") "append" [.str "$DEP_C"] [])
   , .expr (.methodCall (.var "script_parts") "append"
       [.call (.var "cmd_args") [.var "link_cmd"] [("delimiter", .str " ")]] [])
   , .blank
