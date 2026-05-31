@@ -49,6 +49,75 @@ def _get_lean_include_dir() -> str | None:
     """
     return read_root_config("lean", "lean_include_dir", None)
 
+def _lean_library_impl(ctx: AnalysisContext) -> list[Provider]:
+    """
+    Build a Lean library (.olean files).
+    """
+    lean = _get_lean()
+    lean_lib_dir = _get_lean_lib_dir()
+
+    if not ctx.attrs.srcs:
+        return [DefaultInfo(), LeanLibraryInfo()]
+
+    olean_dir = ctx.actions.declare_output("olean", dir = True)
+    c_dir = ctx.actions.declare_output("c", dir = True) if ctx.attrs.extract_c else None
+
+    # Collect dependency olean directories
+    dep_paths = []
+    for dep in ctx.attrs.deps:
+        if LeanLibraryInfo in dep:
+            info = dep[LeanLibraryInfo]
+            if info.olean_dir:
+                dep_paths.append(info.olean_dir)
+
+    script_parts = ["set -e"]
+    script_parts.append("mkdir -p $OLEAN_DIR")
+    if c_dir:
+        script_parts.append("mkdir -p $C_DIR")
+
+    # Build LEAN_PATH
+    lean_path_parts = ["$OLEAN_DIR"]
+    if lean_lib_dir:
+        lean_path_parts.append(lean_lib_dir)
+    for dep_path in dep_paths:
+        lean_path_parts.append(cmd_args(dep_path))
+    script_parts.append(cmd_args("export LEAN_PATH=", cmd_args(lean_path_parts, delimiter = ":"), delimiter = ""))
+
+    # Compile each source
+    for src in ctx.attrs.srcs:
+        module_name = src.basename.removesuffix(".lean")
+        script_parts.append(cmd_args("cp", src, "$BUCK_SCRATCH_PATH/", delimiter = " "))
+        compile_cmd = [lean, "--root=$BUCK_SCRATCH_PATH"]
+        compile_cmd.extend(ctx.attrs.lean_flags)
+        compile_cmd.extend(["-o", cmd_args("$OLEAN_DIR/", module_name, ".olean", delimiter = "")])
+        if c_dir:
+            compile_cmd.append(cmd_args("--c=$C_DIR/", module_name, ".c", delimiter = ""))
+        compile_cmd.append(cmd_args("$BUCK_SCRATCH_PATH/", src.basename, delimiter = ""))
+        script_parts.append(cmd_args(compile_cmd, delimiter = " "))
+
+    script = cmd_args(script_parts, delimiter = "\n")
+    env_parts = ["OLEAN_DIR=", olean_dir.as_output()]
+    if c_dir:
+        env_parts.extend([" C_DIR=", c_dir.as_output()])
+    cmd = cmd_args("/bin/sh", "-c", cmd_args(env_parts, " && ", script, delimiter = ""))
+
+    hidden = list(ctx.attrs.srcs)
+    for dep_path in dep_paths:
+        hidden.append(dep_path)
+    ctx.actions.run(cmd_args(cmd, hidden = hidden), category = "lean_compile", identifier = ctx.attrs.name, local_only = True)
+
+    return [DefaultInfo(default_output = olean_dir), LeanLibraryInfo(olean_dir = olean_dir, c_dir = c_dir, lib_name = ctx.attrs.name, deps = ctx.attrs.deps)]
+
+lean_library = rule(
+    impl = _lean_library_impl,
+    attrs = {
+        "srcs": attrs.list(attrs.source(), default = []),
+        "deps": attrs.list(attrs.dep(), default = []),
+        "lean_flags": attrs.list(attrs.string(), default = []),
+        "extract_c": attrs.bool(default = False),
+    },
+)
+
 def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     """
     Build a Lean executable with hierarchical module support.

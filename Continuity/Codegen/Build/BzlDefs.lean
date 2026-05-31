@@ -243,6 +243,113 @@ private def leanGetConfig (name sect key : String) (errMsg : Option String) : ST
     )] [],
     .ret (.var "path") ]
 
+private def leanLibraryBody : List SStmt :=
+  [ .assign "lean" (.call (.var "_get_lean") [] [])
+  , .assign "lean_lib_dir" (.call (.var "_get_lean_lib_dir") [] [])
+  , .blank
+  , .ifStmt [(.unop "not" (SExpr.ctxAttr "srcs"),
+      [.ret (.list [SExpr.defaultInfo, .call (.var "LeanLibraryInfo") [] []])]
+    )] []
+  , .blank
+  , .assign "olean_dir" (SExpr.ctxAction "declare_output" [.str "olean"] [("dir", .bool true)])
+  , .assign "c_dir" (.ternary
+      (SExpr.ctxAction "declare_output" [.str "c"] [("dir", .bool true)])
+      (SExpr.ctxAttr "extract_c")
+      .none)
+  , .blank
+  , .comment "Collect dependency olean directories"
+  , .assign "dep_paths" (.list [])
+  , .forStmt "dep" (SExpr.ctxAttr "deps") [
+      .ifStmt [(.cmp "in" (.var "LeanLibraryInfo") (.var "dep"), [
+        .assign "info" (.index (.var "dep") (.var "LeanLibraryInfo")),
+        .ifStmt [(.dot (.var "info") "olean_dir", [
+          .expr (.methodCall (.var "dep_paths") "append" [.dot (.var "info") "olean_dir"] [])
+        ])] []
+      ])] []
+    ]
+  , .blank
+  , .assign "script_parts" (.list [.str "set -e"])
+  , .expr (.methodCall (.var "script_parts") "append" [.str "mkdir -p $OLEAN_DIR"] [])
+  , .ifStmt [(.var "c_dir", [
+      .expr (.methodCall (.var "script_parts") "append" [.str "mkdir -p $C_DIR"] [])
+    ])] []
+  , .blank
+  , .comment "Build LEAN_PATH"
+  , .assign "lean_path_parts" (.list [.str "$OLEAN_DIR"])
+  , .ifStmt [(.var "lean_lib_dir", [
+      .expr (.methodCall (.var "lean_path_parts") "append" [.var "lean_lib_dir"] [])
+    ])] []
+  , .forStmt "dep_path" (.var "dep_paths") [
+      .expr (.methodCall (.var "lean_path_parts") "append"
+        [.call (.var "cmd_args") [.var "dep_path"] []] [])
+    ]
+  , .expr (.methodCall (.var "script_parts") "append" [
+      .call (.var "cmd_args") [
+        .str "export LEAN_PATH=",
+        .call (.var "cmd_args") [.var "lean_path_parts"] [("delimiter", .str ":")]
+      ] [("delimiter", .str "")]
+    ] [])
+  , .blank
+  , .comment "Compile each source"
+  , .forStmt "src" (SExpr.ctxAttr "srcs") [
+      .assign "module_name"
+        (.methodCall (.dot (.var "src") "basename") "removesuffix" [.str ".lean"] [])
+    , .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "cp", .var "src", .str "$BUCK_SCRATCH_PATH/"]
+          [("delimiter", .str " ")]] [])
+    , .assign "compile_cmd" (.list [
+        .var "lean", .str "--root=$BUCK_SCRATCH_PATH"])
+    , .expr (.methodCall (.var "compile_cmd") "extend" [SExpr.ctxAttr "lean_flags"] [])
+    , .expr (.methodCall (.var "compile_cmd") "extend" [.list [
+        .str "-o",
+        .call (.var "cmd_args") [.str "$OLEAN_DIR/", .var "module_name", .str ".olean"]
+          [("delimiter", .str "")]
+      ]] [])
+    , .ifStmt [(.var "c_dir", [
+        .expr (.methodCall (.var "compile_cmd") "append"
+          [.call (.var "cmd_args") [.str "--c=$C_DIR/", .var "module_name", .str ".c"]
+            [("delimiter", .str "")]] [])
+      ])] []
+    , .expr (.methodCall (.var "compile_cmd") "append"
+        [.call (.var "cmd_args") [.str "$BUCK_SCRATCH_PATH/", .dot (.var "src") "basename"]
+          [("delimiter", .str "")]] [])
+    , .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.var "compile_cmd"] [("delimiter", .str " ")]] [])
+    ]
+  , .blank
+  , .assign "script" (.call (.var "cmd_args") [.var "script_parts"] [("delimiter", .str "\n")])
+  , .assign "env_parts" (.list [.str "OLEAN_DIR=", .methodCall (.var "olean_dir") "as_output" [] []])
+  , .ifStmt [(.var "c_dir", [
+      .expr (.methodCall (.var "env_parts") "extend"
+        [.list [.str " C_DIR=", .methodCall (.var "c_dir") "as_output" [] []]] [])
+    ])] []
+  , .assign "cmd" (.call (.var "cmd_args") [
+      .str "/bin/sh", .str "-c",
+      .call (.var "cmd_args") [
+        .var "env_parts", .str " && ", .var "script"
+      ] [("delimiter", .str "")]
+    ] [])
+  , .blank
+  , .assign "hidden" (.call (.var "list") [SExpr.ctxAttr "srcs"] [])
+  , .forStmt "dep_path" (.var "dep_paths") [
+      .expr (.methodCall (.var "hidden") "append" [.var "dep_path"] [])
+    ]
+  , .expr (SExpr.ctxAction "run" [
+      .call (.var "cmd_args") [.var "cmd"] [("hidden", .var "hidden")]
+    ] [("category", .str "lean_compile"),
+       ("identifier", SExpr.ctxAttr "name"),
+       ("local_only", .bool true)])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [("default_output", .var "olean_dir")],
+      .call (.var "LeanLibraryInfo") [] [
+        ("olean_dir", .var "olean_dir"),
+        ("c_dir", .var "c_dir"),
+        ("lib_name", SExpr.ctxAttr "name"),
+        ("deps", SExpr.ctxAttr "deps")]
+    ])
+  ]
+
 private def leanBinaryBody : List SStmt :=
   -- This is the complex one — multi-file Lean compilation + linking.
   -- Uses shell script via cmd_args to handle LEAN_PATH, file copying, etc.
@@ -408,6 +515,18 @@ def leanSFile : SFile :=
     , .funcDef "_get_lean_include_dir" [] (some "str | None")
         (some "Get Lean C headers directory.")
         [.ret (SExpr.readConfigOpt "lean" "lean_include_dir")]
+    , .blank
+    -- lean_library
+    , .funcDef "_lean_library_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a Lean library (.olean files).")
+        leanLibraryBody
+    , .ruleDef "lean_library" "_lean_library_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source(), default = [])")
+        , ("deps", .raw "attrs.list(attrs.dep(), default = [])")
+        , ("lean_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("extract_c", .raw "attrs.bool(default = False)") ]
     , .blank
     -- lean_binary
     , .funcDef "_lean_binary_impl"
