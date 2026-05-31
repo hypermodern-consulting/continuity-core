@@ -1,5 +1,6 @@
 import Continuity.Derivation
 import Continuity.Codegen.Build.ToDhall
+import Continuity.Codegen.Build.ToStarlark
 import Continuity.Codegen.Codec.ToCpp
 import Continuity.Codegen.Codec.ToHaskell
 import Continuity.InitBuck2
@@ -7,8 +8,10 @@ import Continuity.Codegen.Effect
 import Continuity.Crypto.SHA256
 
 open Continuity.Codegen.Build
+open Continuity.Codegen.Build.Starlark
 open Continuity.Codegen.Codec
 open Continuity.Emit.Dhall
+open Continuity.Emit.Starlark
 open Continuity.InitBuck2
 
 def cmdGenerate (outDir : String) : IO Unit := do
@@ -45,6 +48,16 @@ def cmdGenerate (outDir : String) : IO Unit := do
   IO.FS.createDirAll gradeCppDir
   IO.FS.writeFile gradeCppPath Continuity.Codegen.Effect.emitCppGradeEnum
   IO.println s!"  wrote grade/continuity_grade.hpp"
+
+  -- Starlark toolchain files (generated from Lean)
+  let starlarkOut := Continuity.Codegen.Build.Starlark.starlarkFiles
+    Continuity.Codegen.Build.Starlark.allToolchains
+  for (path, content) in starlarkOut do
+    let fullPath := s!"{outDir}/{path}"
+    let dir := System.FilePath.mk fullPath |>.parent |>.getD (System.FilePath.mk ".")
+    IO.FS.createDirAll dir
+    IO.FS.writeFile fullPath content
+    IO.println s!"  wrote {path}"
 
   -- Reflective hash prediction (§5 of the paper):
   -- Compute h1 = SHA-256(concatenated output) using the verified Lean implementation.
