@@ -116,15 +116,28 @@ def _nv_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     Uses unwrapped clang to avoid NixOS hardening flags that are
     incompatible with nvptx64 targets (e.g., -fzero-call-used-regs).
     """
+    # Validate CUDA toolchain is configured
+    clang = read_root_config("nv", "clang", None)
+    if clang == None:
+        fail("""
+NVIDIA toolchain not configured.
+
+Enable CUDA in your flake:
+
+    continuity.toolchains.cuda = true;
+
+Then: direnv reload
+
+This generates .buckconfig.local [nv] section with unwrapped clang,
+ptxas, fatbinary, and nvidia-sdk paths from Nix.
+""")
+
     # Read nvidia-sdk paths from config
     nvidia_sdk_path = read_root_config("nv", "nvidia_sdk_path", "/usr/local/cuda")
     nvidia_sdk_include = read_root_config("nv", "nvidia_sdk_include", "/usr/local/cuda/include")
     nvidia_sdk_lib = read_root_config("nv", "nvidia_sdk_lib", "/usr/local/cuda/lib64")
     ptxas = read_root_config("nv", "ptxas", "")
     fatbinary = read_root_config("nv", "fatbinary", "")
-    
-    # Use unwrapped clang for CUDA (no NixOS hardening flags)
-    clang = read_root_config("nv", "clang", "clang++")
     
     # C++ stdlib paths for unwrapped clang
     gcc_include = read_root_config("cxx", "gcc_include", "")
@@ -251,8 +264,19 @@ def _nv_library_impl(ctx: AnalysisContext) -> list[Provider]:
     Uses clang with -x cuda to compile .cu files into position-independent
     object code that can be linked into shared libraries.
     """
-    # Get tools from config
-    cxx = read_root_config("cxx", "cxx", "clang++")
+    # Validate CUDA toolchain is configured
+    clang = read_root_config("nv", "clang", None)
+    if clang == None:
+        fail("""
+NVIDIA toolchain not configured.
+
+Enable CUDA in your flake:
+
+    continuity.toolchains.cuda = true;
+
+Then: direnv reload
+""")
+
     nvidia_sdk_path = read_root_config("nv", "nvidia_sdk_path", "/usr/local/cuda")
     nvidia_sdk_include = read_root_config("nv", "nvidia_sdk_include", "/usr/local/cuda/include")
     
@@ -306,7 +330,7 @@ def _nv_library_impl(ctx: AnalysisContext) -> list[Provider]:
         obj_name = src.short_path.replace(".cu", ".o").replace(".cpp", ".o")
         obj = ctx.actions.declare_output(obj_name)
         
-        cmd = cmd_args([cxx] + compile_flags + [
+        cmd = cmd_args([clang] + compile_flags + [
             "-o", obj.as_output(),
             src,
         ])

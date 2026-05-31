@@ -16,8 +16,3 @@
   target_platform_detector_spec = target:root//...->prelude//platforms:default
 [build]
   execution_platforms = prelude//platforms:default
-[lean]
-  lean = /home/b7r6/.elan/toolchains/leanprover--lean4---v4.30.0/bin/lean
-  leanc = /home/b7r6/.elan/toolchains/leanprover--lean4---v4.30.0/bin/leanc
-  lean_lib_dir = /home/b7r6/.elan/toolchains/leanprover--lean4---v4.30.0/lib/lean
-  lean_include_dir = /home/b7r6/.elan/toolchains/leanprover--lean4---v4.30.0/include
