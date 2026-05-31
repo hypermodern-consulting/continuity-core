@@ -782,6 +782,491 @@ def rustSFile : SFile :=
 
 #eval (renderSFile rustSFile).length
 
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                              // haskell.bzl (AST-based)
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+private def hsToolchainBody : List SStmt :=
+  [ .assign "ghc" (SExpr.readConfig "haskell" "ghc" (.str "bin/ghc"))
+  , .assign "ghc_pkg" (SExpr.readConfig "haskell" "ghc_pkg" (.str "bin/ghc-pkg"))
+  , .assign "haddock" (SExpr.readConfig "haskell" "haddock" (.str "bin/haddock"))
+  , .blank
+  , .ret (.list [
+      SExpr.defaultInfo,
+      .call (.var "HaskellToolchainInfo") [] [
+        ("compiler", .var "ghc"),
+        ("packager", .var "ghc_pkg"),
+        ("linker", .var "ghc"),
+        ("haddock", .var "haddock"),
+        ("compiler_flags", SExpr.ctxAttr "compiler_flags"),
+        ("linker_flags", SExpr.ctxAttr "linker_flags"),
+        ("ghci_script_template", SExpr.ctxAttr "ghci_script_template"),
+        ("ghci_iserv_template", SExpr.ctxAttr "ghci_iserv_template"),
+        ("script_template_processor", SExpr.ctxAttr "script_template_processor"),
+        ("cache_links", .bool true),
+        ("archive_contents", .str "normal"),
+        ("support_expose_package", .bool false) ],
+      .call (.var "HaskellPlatformInfo") [] [("name", .str "x86_64-linux")]
+    ]) ]
+
+/-- Common GHC setup: cmd with mandatory flags, package_db, extensions, packages. -/
+private def hsGhcSetup (cmdVar : String) (addLink : Bool) : List SStmt :=
+  [ .assign cmdVar (.call (.var "cmd_args") [.list [.var "ghc"]] [])
+  , .expr (.methodCall (.var cmdVar) "add" [.str "-package-env=-"] [])
+  ] ++ (if addLink then [] else [.expr (.methodCall (.var cmdVar) "add" [.str "-no-link"] [])]) ++
+  [ .ifStmt [(.var "package_db", [
+      .expr (.methodCall (.var cmdVar) "add" [.str "-package-db", .var "package_db"] [])
+    ])] []
+  , .expr (.methodCall (.var cmdVar) "add" [.var "MANDATORY_GHC_FLAGS"] [])
+  , .expr (.methodCall (.var cmdVar) "add" [.str "-XGHC2024"] [])
+  , .forStmt "ext" (SExpr.ctxAttr "language_extensions") [
+      .expr (.methodCall (.var cmdVar) "add"
+        [.format "-X{}" [.var "ext"]] [])
+    ]
+  , .forStmt "pkg" (SExpr.ctxAttr "packages") [
+      .expr (.methodCall (.var cmdVar) "add" [.str "-package", .var "pkg"] [])
+    ]
+  ]
+
+/-- Collect deps from HaskellLibraryInfo. -/
+private def hsCollectDeps : List SStmt :=
+  [ .assign "dep_hi_dirs" (.list [])
+  , .assign "dep_libs" (.list [])
+  , .assign "dep_sources" (.list [])
+  , .forStmt "dep" (SExpr.ctxAttr "deps") [
+      .ifStmt [(.cmp "in" (.var "HaskellLibraryInfo") (.var "dep"), [
+        .assign "lib_info" (.index (.var "dep") (.var "HaskellLibraryInfo")),
+        .ifStmt [(.dot (.var "lib_info") "hi_dir", [
+          .expr (.methodCall (.var "dep_hi_dirs") "append" [.dot (.var "lib_info") "hi_dir"] [])
+        ])] [],
+        .ifStmt [(.dot (.var "lib_info") "objects", [
+          .expr (.methodCall (.var "dep_libs") "extend" [.dot (.var "lib_info") "objects"] [])
+        ])] [
+          .ifStmt [(.dot (.var "lib_info") "object_dir", [
+            .expr (.methodCall (.var "dep_libs") "append" [.dot (.var "lib_info") "object_dir"] [])
+          ])] []
+        ],
+        .ifStmt [(.dot (.var "lib_info") "modules", [
+          .expr (.methodCall (.var "dep_sources") "extend" [.dot (.var "lib_info") "modules"] [])
+        ])] []
+      ])] []
+    ]
+  ]
+
+/-- Add dep hi dirs as -i flags and source/object deps. -/
+private def hsAddDeps (cmdVar : String) : List SStmt :=
+  [ .forStmt "hi_d" (.var "dep_hi_dirs") [
+      .expr (.methodCall (.var cmdVar) "add"
+        [.call (.var "cmd_args") [.str "-i", .var "hi_d"] [("delimiter", .str "")]] [])
+    ]
+  , .expr (.methodCall (.var cmdVar) "add" [SExpr.ctxAttr "srcs"] [])
+  , .expr (.methodCall (.var cmdVar) "add" [.var "dep_sources"] [])
+  , .expr (.methodCall (.var cmdVar) "add" [.var "dep_libs"] [])
+  ]
+
+private def hsBinaryBody : List SStmt :=
+  [ .assign "ghc" (.call (.var "_get_ghc") [] [])
+  , .assign "package_db" (.call (.var "_get_package_db") [] [])
+  , .assign "out" (SExpr.ctxAction "declare_output" [SExpr.ctxAttr "name"] [])
+  , .assign "obj_dir" (SExpr.ctxAction "declare_output" [.str "objs"] [("dir", .bool true)])
+  , .assign "hi_dir" (SExpr.ctxAction "declare_output" [.str "hi"] [("dir", .bool true)])
+  , .assign "hie_dir" (SExpr.ctxAction "declare_output" [.str "hie"] [("dir", .bool true)])
+  , .blank
+  ] ++ hsCollectDeps ++ [.blank]
+    ++ hsGhcSetup "cmd" true ++
+  [ .expr (.methodCall (.var "cmd") "add" [.str "-O2"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-odir", .methodCall (.var "obj_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-hidir", .methodCall (.var "hi_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-fwrite-ide-info"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-hiedir", .methodCall (.var "hie_dir") "as_output" [] []] [])
+  , .ifStmt [(SExpr.ctxAttr "main", [
+      .expr (.methodCall (.var "cmd") "add" [.str "-main-is", SExpr.ctxAttr "main"] [])
+    ])] []
+  , .expr (.methodCall (.var "cmd") "add" [.str "-o", .methodCall (.var "out") "as_output" [] []] [])
+  , .expr (.methodCall (.var "cmd") "add" [SExpr.ctxAttr "ghc_options"] [])
+  , .expr (.methodCall (.var "cmd") "add" [SExpr.ctxAttr "compiler_flags"] [])
+  , .blank
+  ] ++ hsAddDeps "cmd" ++
+  [ .blank
+  , .expr (SExpr.ctxAction "run" [.var "cmd"] [("category", .str "ghc"), ("identifier", SExpr.ctxAttr "name")])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [
+        ("default_output", .var "out"),
+        ("sub_targets", .dict [
+          (.str "hi", .list [.call (.var "DefaultInfo") [] [("default_outputs", .list [.var "hi_dir"])]]),
+          (.str "hie", .list [.call (.var "DefaultInfo") [] [("default_outputs", .list [.var "hie_dir"])]])])],
+      .call (.var "RunInfo") [] [("args", .call (.var "cmd_args") [.var "out"] [])]
+    ]) ]
+
+private def hsLibraryBody : List SStmt :=
+  [ .assign "ghc" (.call (.var "_get_ghc") [] [])
+  , .assign "package_db" (.call (.var "_get_package_db") [] [])
+  , .blank
+  , .ifStmt [(.unop "not" (SExpr.ctxAttr "srcs"),
+      [.ret (.list [SExpr.defaultInfo,
+        .call (.var "HaskellLibraryInfo") [] [("package_name", SExpr.ctxAttr "name"), ("modules", .list [])]])]
+    )] []
+  , .blank
+  , .assign "obj_dir" (SExpr.ctxAction "declare_output" [.str "objs"] [("dir", .bool true)])
+  , .assign "hi_dir" (SExpr.ctxAction "declare_output" [.str "hi"] [("dir", .bool true)])
+  , .assign "stub_dir" (SExpr.ctxAction "declare_output" [.str "stubs"] [("dir", .bool true)])
+  , .assign "hie_dir" (SExpr.ctxAction "declare_output" [.str "hie"] [("dir", .bool true)])
+  , .blank
+  ] ++ hsCollectDeps ++ [.blank]
+    ++ hsGhcSetup "cmd" false ++
+  [ .expr (.methodCall (.var "cmd") "add" [.str "-odir", .methodCall (.var "obj_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-hidir", .methodCall (.var "hi_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-stubdir", .methodCall (.var "stub_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-fwrite-ide-info"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-hiedir", .methodCall (.var "hie_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "cmd") "add" [SExpr.ctxAttr "ghc_options"] [])
+  , .forStmt "hi_d" (.var "dep_hi_dirs") [
+      .expr (.methodCall (.var "cmd") "add"
+        [.call (.var "cmd_args") [.str "-i", .var "hi_d"] [("delimiter", .str "")]] [])
+    ]
+  , .expr (.methodCall (.var "cmd") "add" [SExpr.ctxAttr "srcs"] [])
+  , .blank
+  , .expr (SExpr.ctxAction "run" [.var "cmd"]
+      [("category", .str "haskell_compile"), ("identifier", SExpr.ctxAttr "name")])
+  , .blank
+  , .comment "Archive objects"
+  , .assign "lib" (SExpr.ctxAction "declare_output"
+      [.format "lib{}.a" [SExpr.ctxAttr "name"]] [])
+  , .assign "ar_cmd" (.call (.var "cmd_args") [
+      .str "/bin/sh", .str "-c",
+      .call (.var "cmd_args") [.str "ar rcs",
+        .methodCall (.var "lib") "as_output" [] [],
+        .call (.var "cmd_args") [.var "obj_dir"] [("format", .str "{}/*.o")]
+      ] [("delimiter", .str " ")]
+    ] [])
+  , .expr (SExpr.ctxAction "run" [.var "ar_cmd"]
+      [("category", .str "haskell_archive"), ("identifier", SExpr.ctxAttr "name")])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [
+        ("default_output", .var "lib"),
+        ("sub_targets", .dict [
+          (.str "hi", .list [.call (.var "DefaultInfo") [] [("default_outputs", .list [.var "hi_dir"])]]),
+          (.str "stubs", .list [.call (.var "DefaultInfo") [] [("default_outputs", .list [.var "stub_dir"])]]),
+          (.str "objects", .list [.call (.var "DefaultInfo") [] [("default_outputs", .list [.var "obj_dir"])]]),
+          (.str "hie", .list [.call (.var "DefaultInfo") [] [("default_outputs", .list [.var "hie_dir"])]])])],
+      .call (.var "HaskellLibraryInfo") [] [
+        ("package_name", SExpr.ctxAttr "name"),
+        ("hi_dir", .var "hi_dir"),
+        ("object_dir", .var "lib"),
+        ("stub_dir", .var "stub_dir"),
+        ("hie_dir", .var "hie_dir"),
+        ("objects", .list []),
+        ("modules", SExpr.ctxAttr "srcs")]
+    ]) ]
+
+private def hsScriptBody : List SStmt :=
+  [ .assign "ghc" (.call (.var "_get_ghc") [] [])
+  , .assign "out" (SExpr.ctxAction "declare_output" [SExpr.ctxAttr "name"] [])
+  , .assign "obj_dir" (SExpr.ctxAction "declare_output" [.str "objs"] [("dir", .bool true)])
+  , .assign "hi_dir" (SExpr.ctxAction "declare_output" [.str "hi"] [("dir", .bool true)])
+  , .assign "cmd" (.call (.var "cmd_args") [.list [.var "ghc"]] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-odir", .methodCall (.var "obj_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-hidir", .methodCall (.var "hi_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "cmd") "add" [.var "MANDATORY_GHC_FLAGS"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-XGHC2024"] [])
+  , .expr (.methodCall (.var "cmd") "add" [SExpr.ctxAttr "compiler_flags"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-o", .methodCall (.var "out") "as_output" [] []] [])
+  , .forStmt "inc" (SExpr.ctxAttr "include_paths") [
+      .expr (.methodCall (.var "cmd") "add" [.binop "+" (.str "-i") (.var "inc")] [])
+    ]
+  , .forStmt "pkg" (SExpr.ctxAttr "packages") [
+      .expr (.methodCall (.var "cmd") "add" [.str "-package", .var "pkg"] [])
+    ]
+  , .expr (.methodCall (.var "cmd") "add" [SExpr.ctxAttr "srcs"] [])
+  , .expr (SExpr.ctxAction "run" [.var "cmd"]
+      [("category", .str "haskell_script"), ("identifier", SExpr.ctxAttr "name")])
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [("default_output", .var "out")],
+      .call (.var "RunInfo") [] [("args", .list [.var "out"])]
+    ]) ]
+
+private def hsCLibraryBody : List SStmt :=
+  [ .assign "ghc" (.call (.var "_get_ghc") [] [])
+  , .assign "package_db" (.call (.var "_get_package_db") [] [])
+  , .assign "stub_dir" (SExpr.ctxAction "declare_output" [.str "stubs"] [("dir", .bool true)])
+  , .assign "lib" (SExpr.ctxAction "declare_output" [.format "lib{}.a" [SExpr.ctxAttr "name"]] [])
+  , .blank
+  , .comment "Collect dependency hi dirs"
+  , .assign "dep_hi_dirs" (.list [])
+  , .forStmt "dep" (SExpr.ctxAttr "deps") [
+      .ifStmt [(.cmp "in" (.var "HaskellLibraryInfo") (.var "dep"), [
+        .assign "lib_info" (.index (.var "dep") (.var "HaskellLibraryInfo")),
+        .ifStmt [(.dot (.var "lib_info") "hi_dir", [
+          .expr (.methodCall (.var "dep_hi_dirs") "append" [.dot (.var "lib_info") "hi_dir"] [])
+        ])] []
+      ])] []
+    ]
+  , .blank
+  , .assign "objects" (.list [])
+  , .assign "hi_files" (.list [])
+  , .forStmt "src" (SExpr.ctxAttr "srcs") [
+      .assign "src_path" (.dot (.var "src") "short_path")
+    , .ifStmt [(.methodCall (.var "src_path") "endswith" [.str ".hs"] [], [
+        .assign "base_name" (.index (.methodCall (.methodCall (.var "src_path") "replace" [.str ".hs", .str ""] []) "split" [.str "/"] []) (.int (-1)))
+      , .assign "obj" (SExpr.ctxAction "declare_output" [.format "{}.o" [.var "base_name"]] [])
+      , .assign "hi" (SExpr.ctxAction "declare_output" [.format "{}.hi" [.var "base_name"]] [])
+      , .assign "cmd" (.call (.var "cmd_args") [.list [.var "ghc"]] [])
+      , .expr (.methodCall (.var "cmd") "add" [.str "-c", .str "-package-env=-", .str "-fPIC"] [])
+      , .ifStmt [(.var "package_db", [
+          .expr (.methodCall (.var "cmd") "add" [.str "-package-db", .var "package_db"] [])
+        ])] []
+      , .expr (.methodCall (.var "cmd") "add" [.str "-stubdir", .methodCall (.var "stub_dir") "as_output" [] []] [])
+      , .expr (.methodCall (.var "cmd") "add" [.str "-o", .methodCall (.var "obj") "as_output" [] []] [])
+      , .expr (.methodCall (.var "cmd") "add" [.str "-ohi", .methodCall (.var "hi") "as_output" [] []] [])
+      , .expr (.methodCall (.var "cmd") "add" [.var "MANDATORY_GHC_FLAGS"] [])
+      , .expr (.methodCall (.var "cmd") "add" [.str "-XGHC2024", .str "-XForeignFunctionInterface"] [])
+      , .forStmt "ext" (SExpr.ctxAttr "language_extensions") [
+          .expr (.methodCall (.var "cmd") "add" [.format "-X{}" [.var "ext"]] [])
+        ]
+      , .expr (.methodCall (.var "cmd") "add" [SExpr.ctxAttr "ghc_options"] [])
+      , .forStmt "hi_d" (.var "dep_hi_dirs") [
+          .expr (.methodCall (.var "cmd") "add"
+            [.call (.var "cmd_args") [.str "-i", .var "hi_d"] [("delimiter", .str "")]] [])
+        ]
+      , .forStmt "pkg" (SExpr.ctxAttr "packages") [
+          .expr (.methodCall (.var "cmd") "add" [.str "-package", .var "pkg"] [])
+        ]
+      , .expr (.methodCall (.var "cmd") "add" [.var "src"] [])
+      , .expr (SExpr.ctxAction "run" [.var "cmd"]
+          [("category", .str "haskell_compile"), ("identifier", .var "src_path")])
+      , .expr (.methodCall (.var "objects") "append" [.var "obj"] [])
+      , .expr (.methodCall (.var "hi_files") "append" [.var "hi"] [])
+      ])] []
+    ]
+  , .blank
+  , .ifStmt [(.unop "not" (.var "objects"), [.ret (.list [SExpr.defaultInfo])])] []
+  , .blank
+  , .comment "Archive objects"
+  , .assign "ar_cmd" (.call (.var "cmd_args") [.str "ar", .str "rcs", .methodCall (.var "lib") "as_output" [] []] [])
+  , .expr (.methodCall (.var "ar_cmd") "add" [.var "objects"] [])
+  , .expr (SExpr.ctxAction "run" [.var "ar_cmd"]
+      [("category", .str "haskell_archive"), ("identifier", SExpr.ctxAttr "name")])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [("default_output", .var "lib")],
+      .call (.var "HaskellIncludeInfo") [] [("include_dirs", .list [.var "stub_dir"])],
+      .call (.var "HaskellLibraryInfo") [] [
+        ("package_name", SExpr.ctxAttr "name"),
+        ("hi_dir", .none),
+        ("object_dir", .var "lib"),
+        ("stub_dir", .var "stub_dir"),
+        ("objects", .var "objects"),
+        ("modules", .list [])]
+    ]) ]
+
+private def hsFFIBinaryBody : List SStmt :=
+  [ .assign "ghc" (.call (.var "_get_ghc") [] [])
+  , .assign "cxx" (SExpr.readConfig "cxx" "cxx" (.str "clang++"))
+  , .assign "gcc_include" (SExpr.readConfig "cxx" "gcc_include" (.str ""))
+  , .assign "gcc_include_arch" (SExpr.readConfig "cxx" "gcc_include_arch" (.str ""))
+  , .assign "glibc_include" (SExpr.readConfig "cxx" "glibc_include" (.str ""))
+  , .assign "clang_resource_dir" (SExpr.readConfig "cxx" "clang_resource_dir" (.str ""))
+  , .assign "gcc_lib_base" (SExpr.readConfig "cxx" "gcc_lib_base" (.str ""))
+  , .assign "out" (SExpr.ctxAction "declare_output" [SExpr.ctxAttr "name"] [])
+  , .blank
+  , .comment "Compile C++ sources"
+  , .assign "cxx_compile_flags" (.list [.str "-std=c++17", .str "-O2", .str "-fPIC", .str "-c"])
+  , .ifStmt [(.var "gcc_include", [
+      .expr (.methodCall (.var "cxx_compile_flags") "extend" [.list [.str "-isystem", .var "gcc_include"]] [])
+    ])] []
+  , .ifStmt [(.var "gcc_include_arch", [
+      .expr (.methodCall (.var "cxx_compile_flags") "extend" [.list [.str "-isystem", .var "gcc_include_arch"]] [])
+    ])] []
+  , .ifStmt [(.var "glibc_include", [
+      .expr (.methodCall (.var "cxx_compile_flags") "extend" [.list [.str "-isystem", .var "glibc_include"]] [])
+    ])] []
+  , .ifStmt [(.var "clang_resource_dir", [
+      .expr (.methodCall (.var "cxx_compile_flags") "extend" [.list [.binop "+" (.str "-resource-dir=") (.var "clang_resource_dir")]] [])
+    ])] []
+  , .expr (.methodCall (.var "cxx_compile_flags") "extend" [.list [.str "-I", .str "."]] [])
+  , .forStmt "inc_dir" (SExpr.ctxAttr "include_dirs") [
+      .expr (.methodCall (.var "cxx_compile_flags") "extend" [.list [.str "-I", .var "inc_dir"]] [])
+    ]
+  , .blank
+  , .assign "cxx_objects" (.list [])
+  , .forStmt "src" (SExpr.ctxAttr "cxx_srcs") [
+      .assign "obj_name" (.methodCall (.methodCall (.dot (.var "src") "short_path") "replace" [.str ".cpp", .str ".o"] []) "replace" [.str ".c", .str ".o"] [])
+    , .assign "obj" (SExpr.ctxAction "declare_output" [.var "obj_name"] [])
+    , .assign "cmd" (.call (.var "cmd_args") [.binop "+" (.list [.var "cxx"]) (.binop "+" (.var "cxx_compile_flags") (.list [.str "-o", .methodCall (.var "obj") "as_output" [] [], .var "src"]))] [])
+    , .expr (SExpr.ctxAction "run" [.var "cmd"]
+        [("category", .str "cxx_compile"), ("identifier", .dot (.var "src") "short_path")])
+    , .expr (.methodCall (.var "cxx_objects") "append" [.var "obj"] [])
+    ]
+  , .blank
+  , .comment "Compile Haskell and link with C++ objects"
+  , .assign "obj_dir" (SExpr.ctxAction "declare_output" [.str "hs_objs"] [("dir", .bool true)])
+  , .assign "hi_dir" (SExpr.ctxAction "declare_output" [.str "hs_hi"] [("dir", .bool true)])
+  , .assign "ghc_cmd" (.call (.var "cmd_args") [.list [.var "ghc"]] [])
+  , .ifStmt [(SExpr.ctxAttr "ghc_options", [
+      .expr (.methodCall (.var "ghc_cmd") "add" [SExpr.ctxAttr "ghc_options"] [])
+    ])] [
+      .expr (.methodCall (.var "ghc_cmd") "add" [.str "-O2", .str "-threaded"] [])
+    ]
+  , .expr (.methodCall (.var "ghc_cmd") "add" [.str "-odir", .methodCall (.var "obj_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "ghc_cmd") "add" [.str "-hidir", .methodCall (.var "hi_dir") "as_output" [] []] [])
+  , .expr (.methodCall (.var "ghc_cmd") "add" [.var "MANDATORY_GHC_FLAGS"] [])
+  , .expr (.methodCall (.var "ghc_cmd") "add" [.str "-XGHC2024"] [])
+  , .forStmt "inc_dir" (SExpr.ctxAttr "include_dirs") [
+      .ifStmt [(.var "inc_dir", [
+        .expr (.methodCall (.var "ghc_cmd") "add" [.str "-optc", .binop "+" (.str "-I") (.var "inc_dir")] [])
+      ])] []
+    ]
+  , .ifStmt [(.var "gcc_lib_base", [
+      .expr (.methodCall (.var "ghc_cmd") "add" [.str "-optl", .binop "+" (.str "-L") (.var "gcc_lib_base")] [])
+    ])] []
+  , .forStmt "lib_dir" (SExpr.ctxAttr "extra_lib_dirs") [
+      .ifStmt [(.var "lib_dir", [
+        .expr (.methodCall (.var "ghc_cmd") "add" [.str "-optl", .binop "+" (.str "-L") (.var "lib_dir")] [])
+      ])] []
+    ]
+  , .forStmt "lib" (SExpr.ctxAttr "extra_libs") [
+      .expr (.methodCall (.var "ghc_cmd") "add" [.binop "+" (.str "-l") (.var "lib")] [])
+    ]
+  , .expr (.methodCall (.var "ghc_cmd") "add" [.str "-lstdc++"] [])
+  , .expr (.methodCall (.var "ghc_cmd") "add" [.str "-o", .methodCall (.var "out") "as_output" [] []] [])
+  , .forStmt "ext" (SExpr.ctxAttr "language_extensions") [
+      .expr (.methodCall (.var "ghc_cmd") "add" [.format "-X{}" [.var "ext"]] [])
+    ]
+  , .expr (.methodCall (.var "ghc_cmd") "add" [SExpr.ctxAttr "compiler_flags"] [])
+  , .expr (.methodCall (.var "ghc_cmd") "add" [SExpr.ctxAttr "hs_srcs"] [])
+  , .expr (.methodCall (.var "ghc_cmd") "add" [.var "cxx_objects"] [])
+  , .expr (SExpr.ctxAction "run" [.var "ghc_cmd"]
+      [("category", .str "ghc_link"), ("identifier", SExpr.ctxAttr "name")])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [("default_output", .var "out")],
+      .call (.var "RunInfo") [] [("args", .list [.var "out"])]
+    ]) ]
+
+private def hsRuleAttrs : List (String × SExpr) :=
+  [ ("srcs", .raw "attrs.list(attrs.source())")
+  , ("deps", .raw "attrs.list(attrs.dep(), default = [])")
+  , ("main", .raw "attrs.option(attrs.string(), default = None)")
+  , ("packages", .raw "attrs.list(attrs.string(), default = [])")
+  , ("ghc_options", .raw "attrs.list(attrs.string(), default = [])")
+  , ("language_extensions", .raw "attrs.list(attrs.string(), default = [])")
+  , ("compiler_flags", .raw "attrs.list(attrs.string(), default = [])") ]
+
+def haskellSFile : SFile :=
+  { header := "# toolchains/haskell.bzl — generated by continuity\n#\n# Haskell toolchain + rules. Builder → AST → Render."
+  , items := [
+      .load "@prelude//haskell:toolchain.bzl" ["HaskellToolchainInfo", "HaskellPlatformInfo"]
+    , .blank
+    , .globalAssign "MANDATORY_GHC_FLAGS" (.list [.str "-Wall", .str "-Werror"])
+    , .blank
+    , .funcDef "_get_ghc" [] (some "str") (some "Get GHC from config.")
+        [.ret (SExpr.readConfig "haskell" "ghc" (.str "bin/ghc"))]
+    , .funcDef "_get_ghc_pkg" [] (some "str") (some "Get ghc-pkg from config.")
+        [.ret (SExpr.readConfig "haskell" "ghc_pkg" (.str "bin/ghc-pkg"))]
+    , .funcDef "_get_package_db" [] (some "str | None") (some "Get global package DB.")
+        [.ret (SExpr.readConfigOpt "haskell" "global_package_db")]
+    , .blank
+    , .provider "HaskellLibraryInfo"
+        [("package_name", "str"),
+         ("hi_dir", "Artifact | None, default = None"),
+         ("object_dir", "Artifact | None, default = None"),
+         ("stub_dir", "Artifact | None, default = None"),
+         ("hie_dir", "Artifact | None, default = None"),
+         ("objects", "list, default = []"),
+         ("modules", "list, default = []")]
+    , .provider "HaskellIncludeInfo"
+        [("include_dirs", "list, default = []")]
+    , .blank
+    -- haskell_toolchain
+    , .funcDef "_haskell_toolchain_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Haskell toolchain with paths from .buckconfig.local.")
+        hsToolchainBody
+    , .ruleDef "haskell_toolchain" "_haskell_toolchain_impl" true
+        [ ("compiler_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("linker_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("ghci_script_template", .raw "attrs.option(attrs.source(), default = None)")
+        , ("ghci_iserv_template", .raw "attrs.option(attrs.source(), default = None)")
+        , ("script_template_processor", .raw "attrs.option(attrs.exec_dep(providers = [RunInfo]), default = None)") ]
+    , .blank
+    -- haskell_library
+    , .funcDef "_haskell_library_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a Haskell library (.hi + .o + archive).")
+        hsLibraryBody
+    , .ruleDef "haskell_library" "_haskell_library_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source(), default = [])")
+        , ("deps", .raw "attrs.list(attrs.dep(), default = [])")
+        , ("packages", .raw "attrs.list(attrs.string(), default = [])")
+        , ("ghc_options", .raw "attrs.list(attrs.string(), default = [])")
+        , ("language_extensions", .raw "attrs.list(attrs.string(), default = [])") ]
+    , .blank
+    -- haskell_binary
+    , .funcDef "_haskell_binary_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a Haskell executable.")
+        hsBinaryBody
+    , .ruleDef "haskell_binary" "_haskell_binary_impl" false hsRuleAttrs
+    , .blank
+    -- haskell_c_library (FFI exports for C consumers)
+    , .funcDef "_haskell_c_library_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a C-callable library from Haskell with foreign exports.")
+        hsCLibraryBody
+    , .ruleDef "haskell_c_library" "_haskell_c_library_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source(), default = [])")
+        , ("deps", .raw "attrs.list(attrs.dep(), default = [])")
+        , ("packages", .raw "attrs.list(attrs.string(), default = [\"base\"])")
+        , ("ghc_options", .raw "attrs.list(attrs.string(), default = [])")
+        , ("language_extensions", .raw "attrs.list(attrs.string(), default = [])") ]
+    , .blank
+    -- haskell_ffi_binary (Haskell calling C/C++)
+    , .funcDef "_haskell_ffi_binary_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a Haskell binary that calls C/C++ via FFI.")
+        hsFFIBinaryBody
+    , .ruleDef "haskell_ffi_binary" "_haskell_ffi_binary_impl" false
+        [ ("hs_srcs", .raw "attrs.list(attrs.source())")
+        , ("cxx_srcs", .raw "attrs.list(attrs.source(), default = [])")
+        , ("cxx_headers", .raw "attrs.list(attrs.source(), default = [])")
+        , ("deps", .raw "attrs.list(attrs.dep(), default = [])")
+        , ("packages", .raw "attrs.list(attrs.string(), default = [])")
+        , ("ghc_options", .raw "attrs.list(attrs.string(), default = [])")
+        , ("extra_libs", .raw "attrs.list(attrs.string(), default = [])")
+        , ("extra_lib_dirs", .raw "attrs.list(attrs.string(), default = [])")
+        , ("include_dirs", .raw "attrs.list(attrs.string(), default = [])")
+        , ("compiler_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("language_extensions", .raw "attrs.list(attrs.string(), default = [])") ]
+    , .blank
+    -- haskell_script
+    , .funcDef "_haskell_script_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a single-file Haskell script.")
+        hsScriptBody
+    , .ruleDef "haskell_script" "_haskell_script_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source())")
+        , ("include_paths", .raw "attrs.list(attrs.string(), default = [])")
+        , ("compiler_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("packages", .raw "attrs.list(attrs.string(), default = [])") ]
+    , .blank
+    -- haskell_test (reuses binary impl)
+    , .ruleDef "haskell_test" "_haskell_binary_impl" false
+        (hsRuleAttrs.map fun (k, v) =>
+          if k == "packages" then ("packages", .raw "attrs.list(attrs.string(), default = [\"base\"])")
+          else (k, v))
+    ] }
+
+#eval (renderSFile haskellSFile).length
+
 /- ════════════════════════════════════════════════════════════════════════════════
                                                        // all .bzl files
    ════════════════════════════════════════════════════════════════════════════════ -/
@@ -790,6 +1275,7 @@ def bzlFiles : List (String × String) :=
   [ ("toolchains/cxx.bzl", renderBzlFile cxxBzl)
   , ("toolchains/lean.bzl", renderSFile leanSFile)
   , ("toolchains/rust.bzl", renderSFile rustSFile)
+  , ("toolchains/haskell.bzl", renderSFile haskellSFile)
   ]
 
 end Continuity.Codegen.Build.BzlDefs
