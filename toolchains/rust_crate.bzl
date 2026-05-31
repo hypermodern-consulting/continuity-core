@@ -16,7 +16,7 @@
 #       deps = [":serde_derive"],
 #   )
 
-load("@straylight_prelude//http_archive.bzl", "http_archive")
+load("@prelude//http_archive.bzl", "http_archive")
 
 # Provider for crate outputs
 RustCrateInfo = provider(fields = [

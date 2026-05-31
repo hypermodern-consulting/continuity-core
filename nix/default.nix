@@ -67,7 +67,11 @@
 
       toolchainPackages = lib.concatLists [
         (lib.optional cfg.toolchains.lean       lean4)
-        (lib.optional cfg.toolchains.cxx        pkgs.gcc)
+        (lib.optionals cfg.toolchains.cxx [
+          pkgs.llvmPackages_19.clang
+          pkgs.llvmPackages_19.lld
+          pkgs.gcc  # still needed for libstdc++
+        ])
         (lib.optional cfg.toolchains.haskell    pkgs.ghc)
         (lib.optional cfg.toolchains.haskell    pkgs.cabal-install)
         (lib.optional cfg.toolchains.rust       pkgs.rustc)
