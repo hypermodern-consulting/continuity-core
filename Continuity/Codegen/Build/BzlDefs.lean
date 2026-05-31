@@ -1267,6 +1267,211 @@ def haskellSFile : SFile :=
 
 #eval (renderSFile haskellSFile).length
 
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                              // nv.bzl (AST-based)
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+private def nvToolchainBody : List SStmt :=
+  [ .assign "nvidia_sdk_path" (SExpr.readConfig "nv" "nvidia_sdk_path" (SExpr.ctxAttr "nvidia_sdk_path"))
+  , .assign "nvidia_sdk_include" (SExpr.readConfig "nv" "nvidia_sdk_include" (SExpr.ctxAttr "nvidia_sdk_include"))
+  , .assign "nvidia_sdk_lib" (SExpr.readConfig "nv" "nvidia_sdk_lib" (SExpr.ctxAttr "nvidia_sdk_lib"))
+  , .blank
+  , .ret (.list [
+      SExpr.defaultInfo,
+      .call (.var "NvToolchainInfo") [] [
+        ("nvidia_sdk_path", .var "nvidia_sdk_path"),
+        ("nvidia_sdk_include", .var "nvidia_sdk_include"),
+        ("nvidia_sdk_lib", .var "nvidia_sdk_lib"),
+        ("nv_archs", SExpr.ctxAttr "nv_archs") ] ]) ]
+
+/-- Config reads shared by nv_binary and nv_library. -/
+private def nvConfigReads : List SStmt :=
+  [ .comment "Validate CUDA toolchain"
+  , .assign "clang" (SExpr.readConfigOpt "nv" "clang")
+  , .ifStmt [(.cmp "==" (.var "clang") .none, [
+      .expr (.call (.var "fail") [.strBlock
+        "\nNVIDIA toolchain not configured.\nEnable CUDA in your flake:\n    continuity.toolchains.cuda = true;\nThen: direnv reload\n"] [])
+    ])] []
+  , .assign "nvidia_sdk_path" (SExpr.readConfig "nv" "nvidia_sdk_path" (.str "/usr/local/cuda"))
+  , .assign "nvidia_sdk_include" (SExpr.readConfig "nv" "nvidia_sdk_include" (.str "/usr/local/cuda/include"))
+  , .assign "nvidia_sdk_lib" (SExpr.readConfig "nv" "nvidia_sdk_lib" (.str "/usr/local/cuda/lib64"))
+  , .assign "ptxas" (SExpr.readConfig "nv" "ptxas" (.str ""))
+  , .assign "gcc_include" (SExpr.readConfig "cxx" "gcc_include" (.str ""))
+  , .assign "gcc_include_arch" (SExpr.readConfig "cxx" "gcc_include_arch" (.str ""))
+  , .assign "glibc_include" (SExpr.readConfig "cxx" "glibc_include" (.str ""))
+  , .assign "clang_resource_dir" (SExpr.readConfig "cxx" "clang_resource_dir" (.str ""))
+  , .assign "nv_archs_str" (SExpr.readConfig "nv" "archs" (.str "sm_90"))
+  , .assign "nv_archs" (.methodCall (.var "nv_archs_str") "split" [.str ","] [])
+  ]
+
+/-- Compile flags construction shared by nv_binary and nv_library. -/
+private def nvCompileFlags (std : String) : List SStmt :=
+  [ .assign "compile_flags" (.list [
+      .str "-x", .str "cuda",
+      .binop "+" (.str "--cuda-path=") (.var "nvidia_sdk_path"),
+      .str "-isystem", .var "nvidia_sdk_include",
+      .str s!"-std={std}", .str "-c"])
+  , .ifStmt [(.var "ptxas", [
+      .expr (.methodCall (.var "compile_flags") "extend"
+        [.list [.binop "+" (.str "--ptxas-path=") (.var "ptxas")]] [])
+    ])] []
+  , .forStmt "arch" (.var "nv_archs") [
+      .expr (.methodCall (.var "compile_flags") "extend"
+        [.list [.binop "+" (.str "--cuda-gpu-arch=") (.methodCall (.var "arch") "strip" [] [])]] [])
+    , .expr (.methodCall (.var "compile_flags") "extend"
+        [.list [.binop "+" (.str "--cuda-include-ptx=") (.methodCall (.var "arch") "strip" [] [])]] [])
+    ]
+  , .ifStmt [(.var "clang_resource_dir", [
+      .expr (.methodCall (.var "compile_flags") "extend"
+        [.list [.binop "+" (.str "-resource-dir=") (.var "clang_resource_dir")]] [])
+    ])] []
+  , .ifStmt [(.var "gcc_include", [
+      .expr (.methodCall (.var "compile_flags") "extend" [.list [.str "-isystem", .var "gcc_include"]] [])
+    ])] []
+  , .ifStmt [(.var "gcc_include_arch", [
+      .expr (.methodCall (.var "compile_flags") "extend" [.list [.str "-isystem", .var "gcc_include_arch"]] [])
+    ])] []
+  , .ifStmt [(.var "glibc_include", [
+      .expr (.methodCall (.var "compile_flags") "extend" [.list [.str "-isystem", .var "glibc_include"]] [])
+    ])] []
+  ]
+
+/-- Compile loop: compile each source to .o -/
+private def nvCompileLoop : List SStmt :=
+  [ .assign "objects" (.list [])
+  , .forStmt "src" (SExpr.ctxAttr "srcs") [
+      .assign "obj_name" (.methodCall (.methodCall (.dot (.var "src") "short_path") "replace" [.str ".cu", .str ".o"] []) "replace" [.str ".cpp", .str ".o"] [])
+    , .assign "obj" (SExpr.ctxAction "declare_output" [.var "obj_name"] [])
+    , .assign "cmd" (.call (.var "cmd_args") [.binop "+" (.list [.var "clang"]) (.binop "+" (.var "compile_flags") (.list [.str "-o", .methodCall (.var "obj") "as_output" [] [], .var "src"]))] [])
+    , .expr (SExpr.ctxAction "run" [.var "cmd"]
+        [("category", .str "nv_compile"), ("identifier", .dot (.var "src") "short_path")])
+    , .expr (.methodCall (.var "objects") "append" [.var "obj"] [])
+    ]
+  ]
+
+private def nvBinaryBody : List SStmt :=
+  nvConfigReads ++
+  [ .assign "gcc_lib" (SExpr.readConfig "cxx" "gcc_lib" (.str ""))
+  , .assign "gcc_lib_base" (SExpr.readConfig "cxx" "gcc_lib_base" (.str ""))
+  , .assign "glibc_lib" (SExpr.readConfig "cxx" "glibc_lib" (.str ""))
+  , .assign "ld" (SExpr.readConfig "cxx" "ld" (.str "ld.lld"))
+  , .assign "mdspan_include" (SExpr.readConfig "nv" "mdspan_include" (.str ""))
+  , .blank
+  ] ++ nvCompileFlags "c++23" ++
+  [ .expr (.methodCall (.var "compile_flags") "append" [.str "-Wno-unknown-cuda-version"] [])
+  , .ifStmt [(.var "mdspan_include", [
+      .expr (.methodCall (.var "compile_flags") "extend" [.list [.str "-isystem", .var "mdspan_include"]] [])
+    ])] []
+  , .blank
+  ] ++ nvCompileLoop ++
+  [ .blank
+  , .comment "Link"
+  , .assign "link_flags" (.list [
+      .binop "+" (.str "-fuse-ld=") (.var "ld"),
+      .binop "+" (.str "-L") (.var "nvidia_sdk_lib"),
+      .binop "+" (.str "-Wl,-rpath,") (.var "nvidia_sdk_lib"),
+      .str "-lcudart"])
+  , .ifStmt [(.var "gcc_lib", [
+      .expr (.methodCall (.var "link_flags") "extend"
+        [.list [.binop "+" (.str "-B") (.var "gcc_lib"), .binop "+" (.str "-L") (.var "gcc_lib")]] [])
+    ])] []
+  , .ifStmt [(.var "gcc_lib_base", [
+      .expr (.methodCall (.var "link_flags") "extend"
+        [.list [.binop "+" (.str "-L") (.var "gcc_lib_base"), .binop "+" (.str "-Wl,-rpath,") (.var "gcc_lib_base")]] [])
+    ])] []
+  , .ifStmt [(.var "glibc_lib", [
+      .expr (.methodCall (.var "link_flags") "extend"
+        [.list [.binop "+" (.str "-B") (.var "glibc_lib"),
+                .binop "+" (.str "-L") (.var "glibc_lib"),
+                .binop "+" (.str "-Wl,-rpath,") (.var "glibc_lib"),
+                .binop "+" (.binop "+" (.str "-Wl,--dynamic-linker=") (.var "glibc_lib")) (.str "/ld-linux-x86-64.so.2")]] [])
+    ])] []
+  , .assign "out" (SExpr.ctxAction "declare_output" [SExpr.ctxAttr "name"] [])
+  , .assign "link_cmd" (.call (.var "cmd_args") [
+      .binop "+" (.list [.var "clang"]) (.binop "+" (.var "link_flags")
+        (.list [.str "-o", .methodCall (.var "out") "as_output" [] []]))] [])
+  , .expr (.methodCall (.var "link_cmd") "add" [.var "objects"] [])
+  , .expr (SExpr.ctxAction "run" [.var "link_cmd"]
+      [("category", .str "nv_link"), ("identifier", SExpr.ctxAttr "name")])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [("default_output", .var "out")],
+      .call (.var "RunInfo") [] [("args", .call (.var "cmd_args") [.list [.var "out"]] [])]
+    ]) ]
+
+private def nvLibraryBody : List SStmt :=
+  nvConfigReads ++ [.blank]
+  ++ nvCompileFlags "c++17" ++
+  [ .expr (.methodCall (.var "compile_flags") "append" [.str "-fPIC"] [])
+  , .blank
+  ] ++ nvCompileLoop ++
+  [ .blank
+  , .assign "include_dir" (.str "")
+  , .ifStmt [(SExpr.ctxAttr "exported_headers", [
+      .assign "first_header" (.index (SExpr.ctxAttr "exported_headers") (.int 0))
+    , .ifStmt [(.cmp "in" (.str "/") (.dot (.var "first_header") "short_path"), [
+        .assign "include_dir" (.index (.methodCall (.dot (.var "first_header") "short_path") "rsplit" [.str "/", .int 1] []) (.int 0))
+      ])] [
+        .assign "include_dir" (.str ".")
+      ]
+    ])] []
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [
+        ("default_output", .ternary (.index (.var "objects") (.int 0)) (.var "objects") .none),
+        ("other_outputs", .ternary
+          (.raw "objects[1:]")
+          (.cmp ">" (.call (.var "len") [.var "objects"] []) (.int 1))
+          (.list []))],
+      .call (.var "NvLibraryInfo") [] [
+        ("objects", .var "objects"),
+        ("headers", SExpr.ctxAttr "exported_headers"),
+        ("include_dir", .var "include_dir")]
+    ]) ]
+
+def nvSFile : SFile :=
+  { header := "# toolchains/nv.bzl — generated by continuity\n#\n# NVIDIA toolchain using clang (NOT nvcc). Builder → AST → Render.\n# \"nv\" not \"cuda\" — explicit about the target hardware."
+  , items := [
+      .provider "NvToolchainInfo"
+        [("nvidia_sdk_path", "str"), ("nvidia_sdk_include", "str"),
+         ("nvidia_sdk_lib", "str"), ("nv_archs", "list[str]")]
+    , .blank
+    , .funcDef "_nv_toolchain_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "NVIDIA toolchain with paths from .buckconfig.local.")
+        nvToolchainBody
+    , .ruleDef "nv_toolchain" "_nv_toolchain_impl" true
+        [ ("nv_archs", .raw "attrs.list(attrs.string(), default = [\"sm_90\"])")
+        , ("nvidia_sdk_path", .raw "attrs.string(default = \"/usr/local/cuda\")")
+        , ("nvidia_sdk_include", .raw "attrs.string(default = \"/usr/local/cuda/include\")")
+        , ("nvidia_sdk_lib", .raw "attrs.string(default = \"/usr/local/cuda/lib64\")") ]
+    , .blank
+    , .funcDef "_nv_binary_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build an NVIDIA binary using clang (NOT nvcc).")
+        nvBinaryBody
+    , .ruleDef "nv_binary" "_nv_binary_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source())")
+        , ("deps", .raw "attrs.list(attrs.dep(), default = [])") ]
+    , .blank
+    , .provider "NvLibraryInfo"
+        [("objects", "list"), ("headers", "list"), ("include_dir", "str")]
+    , .funcDef "_nv_library_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Compile CUDA sources into object files.")
+        nvLibraryBody
+    , .ruleDef "nv_library" "_nv_library_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source())")
+        , ("exported_headers", .raw "attrs.list(attrs.source(), default = [])")
+        , ("deps", .raw "attrs.list(attrs.dep(), default = [])") ]
+    ] }
+
+#eval (renderSFile nvSFile).length
+
 /- ════════════════════════════════════════════════════════════════════════════════
                                                        // all .bzl files
    ════════════════════════════════════════════════════════════════════════════════ -/
@@ -1276,6 +1481,7 @@ def bzlFiles : List (String × String) :=
   , ("toolchains/lean.bzl", renderSFile leanSFile)
   , ("toolchains/rust.bzl", renderSFile rustSFile)
   , ("toolchains/haskell.bzl", renderSFile haskellSFile)
+  , ("toolchains/nv.bzl", renderSFile nvSFile)
   ]
 
 end Continuity.Codegen.Build.BzlDefs
