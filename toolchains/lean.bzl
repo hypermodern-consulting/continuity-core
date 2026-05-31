@@ -60,7 +60,7 @@ def _lean_library_impl(ctx: AnalysisContext) -> list[Provider]:
         return [DefaultInfo(), LeanLibraryInfo()]
 
     olean_dir = ctx.actions.declare_output("olean", dir = True)
-    c_dir = ctx.actions.declare_output("c", dir = True) if ctx.attrs.extract_c else None
+    c_dir = ctx.actions.declare_output("c", dir = True)
 
     # Collect dependency olean directories
     dep_paths = []
@@ -139,13 +139,16 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     olean_dir = ctx.actions.declare_output("olean", dir = True)
     c_dir = ctx.actions.declare_output("c", dir = True)
 
-    # Collect dependency olean directories
+    # Collect dependency olean and C directories
     dep_paths = []
+    dep_c_dirs = []
     for dep in ctx.attrs.deps:
         if LeanLibraryInfo in dep:
             info = dep[LeanLibraryInfo]
             if info.olean_dir:
                 dep_paths.append(info.olean_dir)
+            if info.c_dir:
+                dep_c_dirs.append(info.c_dir)
 
     # Build LEAN_PATH
     lean_path_parts = ["$OLEAN_DIR", "$BUCK_SCRATCH_PATH"]
@@ -204,6 +207,9 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
     link_cmd.extend(ctx.attrs.link_flags)
     for c_file in c_files:
         link_cmd.append(c_file)
+    # Add dependency library C files
+    for dep_c_dir in dep_c_dirs:
+        link_cmd.append(cmd_args(dep_c_dir, "/*.c", delimiter = ""))
     script_parts.append(cmd_args(link_cmd, delimiter = " "))
 
     script = cmd_args(script_parts, delimiter = "\n")
@@ -211,6 +217,7 @@ def _lean_binary_impl(ctx: AnalysisContext) -> list[Provider]:
 
     hidden = list(ctx.attrs.srcs)
     hidden.extend(dep_paths)
+    hidden.extend(dep_c_dirs)
 
     ctx.actions.run(cmd_args(cmd, hidden = hidden), category = "lean_link", identifier = ctx.attrs.name, local_only = True)
 

@@ -252,10 +252,8 @@ private def leanLibraryBody : List SStmt :=
     )] []
   , .blank
   , .assign "olean_dir" (SExpr.ctxAction "declare_output" [.str "olean"] [("dir", .bool true)])
-  , .assign "c_dir" (.ternary
+  , .assign "c_dir"
       (SExpr.ctxAction "declare_output" [.str "c"] [("dir", .bool true)])
-      (SExpr.ctxAttr "extract_c")
-      .none)
   , .blank
   , .comment "Collect dependency olean directories"
   , .assign "dep_paths" (.list [])
@@ -387,13 +385,17 @@ private def leanBinaryBody : List SStmt :=
   , .assign "c_dir"
       (SExpr.ctxAction "declare_output" [.str "c"] [("dir", .bool true)])
   , .blank
-  , .comment "Collect dependency olean directories"
+  , .comment "Collect dependency olean and C directories"
   , .assign "dep_paths" (.list [])
+  , .assign "dep_c_dirs" (.list [])
   , .forStmt "dep" (SExpr.ctxAttr "deps") [
       .ifStmt [(.cmp "in" (.var "LeanLibraryInfo") (.var "dep"), [
         .assign "info" (.index (.var "dep") (.var "LeanLibraryInfo")),
         .ifStmt [(.dot (.var "info") "olean_dir", [
           .expr (.methodCall (.var "dep_paths") "append" [.dot (.var "info") "olean_dir"] [])
+        ])] [],
+        .ifStmt [(.dot (.var "info") "c_dir", [
+          .expr (.methodCall (.var "dep_c_dirs") "append" [.dot (.var "info") "c_dir"] [])
         ])] []
       ])] []
     ]
@@ -481,6 +483,12 @@ private def leanBinaryBody : List SStmt :=
   , .forStmt "c_file" (.var "c_files") [
       .expr (.methodCall (.var "link_cmd") "append" [.var "c_file"] [])
     ]
+  , .comment "Add dependency library C files"
+  , .forStmt "dep_c_dir" (.var "dep_c_dirs") [
+      .expr (.methodCall (.var "link_cmd") "append"
+        [.call (.var "cmd_args") [.var "dep_c_dir", .str "/*.c"]
+          [("delimiter", .str "")]] [])
+    ]
   , .expr (.methodCall (.var "script_parts") "append"
       [.call (.var "cmd_args") [.var "link_cmd"] [("delimiter", .str " ")]] [])
   , .blank
@@ -496,6 +504,7 @@ private def leanBinaryBody : List SStmt :=
   , .blank
   , .assign "hidden" (.call (.var "list") [SExpr.ctxAttr "srcs"] [])
   , .expr (.methodCall (.var "hidden") "extend" [.var "dep_paths"] [])
+  , .expr (.methodCall (.var "hidden") "extend" [.var "dep_c_dirs"] [])
   , .blank
   , .expr (SExpr.ctxAction "run" [
       .call (.var "cmd_args") [.var "cmd"] [("hidden", .var "hidden")]
