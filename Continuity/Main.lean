@@ -70,7 +70,7 @@ def cmdGenerate (outDir : String) : IO Unit := do
     IO.println s!"  wrote {path} (generated)"
 
   -- .bzl files not yet migrated to BzlFile definitions (read from disk)
-  let diskBzl := ["purescript.bzl", "rust_crate.bzl", "execution.bzl",
+  let diskBzl := ["rust_crate.bzl", "execution.bzl",
                    "cuda.bzl", "nix.bzl", "python.bzl"]
   for bzl in diskBzl do
     let srcPath := s!"toolchains/{bzl}"

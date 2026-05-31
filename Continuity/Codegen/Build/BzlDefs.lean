@@ -1472,6 +1472,156 @@ def nvSFile : SFile :=
 
 #eval (renderSFile nvSFile).length
 
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                          // purescript.bzl (AST-based)
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+private def psToolchainBody : List SStmt :=
+  [ .assign "purs" (SExpr.readConfig "purescript" "purs" (SExpr.ctxAttr "purs"))
+  , .assign "spago" (SExpr.readConfig "purescript" "spago" (SExpr.ctxAttr "spago"))
+  , .assign "node" (SExpr.readConfig "purescript" "node" (SExpr.ctxAttr "node"))
+  , .ret (.list [
+      SExpr.defaultInfo,
+      .call (.var "PureScriptToolchainInfo") [] [
+        ("purs", .var "purs"), ("spago", .var "spago"), ("node", .var "node") ] ]) ]
+
+private def psAppBody : List SStmt :=
+  [ .assign "purs" (.call (.var "_get_purs") [] [])
+  , .assign "spago" (.call (.var "_get_spago") [] [])
+  , .assign "node" (.call (.var "_get_node") [] [])
+  , .blank
+  , .ifStmt [(.unop "not" (SExpr.ctxAttr "srcs"),
+      [.expr (.call (.var "fail") [.str "purescript_app requires at least one source file"] [])]
+    )] []
+  , .assign "dist_dir" (SExpr.ctxAction "declare_output" [.str "dist"] [("dir", .bool true)])
+  , .assign "script_parts" (.list [.str "set -e"])
+  , .blank
+  , .comment "Set up PATH for spago to find purs"
+  , .assign "esbuild" (.call (.var "_get_esbuild") [] [])
+  , .ifStmt [(.var "esbuild", [
+      .expr (.methodCall (.var "script_parts") "append"
+        [.format "export PATH=\"$(dirname {})\":\"$(dirname {})\":$PATH" [.var "purs", .var "esbuild"]] [])
+    ])] [
+      .expr (.methodCall (.var "script_parts") "append"
+        [.format "export PATH=\"$(dirname {})\":$PATH" [.var "purs"]] [])
+    ]
+  , .expr (.methodCall (.var "script_parts") "append" [.str "WORK_DIR=$BUCK_SCRATCH_PATH/work"] [])
+  , .expr (.methodCall (.var "script_parts") "append" [.str "mkdir -p $WORK_DIR/src/Component"] [])
+  , .blank
+  , .comment "Copy spago config"
+  , .ifStmt [(SExpr.ctxAttr "spago_yaml", [
+      .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "cp ", SExpr.ctxAttr "spago_yaml", .str " $WORK_DIR/spago.yaml"] [("delimiter", .str "")]] [])
+    ])] []
+  , .ifStmt [(SExpr.ctxAttr "spago_dhall", [
+      .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "cp ", SExpr.ctxAttr "spago_dhall", .str " $WORK_DIR/spago.dhall"] [("delimiter", .str "")]] [])
+    ])] []
+  , .blank
+  , .comment "Copy sources preserving structure"
+  , .forStmt "src" (SExpr.ctxAttr "srcs") [
+      .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "mkdir -p \"$WORK_DIR/$(dirname ", .var "src", .str ")\" && cp ", .var "src", .str " \"$WORK_DIR/", .var "src", .str "\""] [("delimiter", .str "")]] [])
+    ]
+  , .blank
+  , .comment "Build and bundle"
+  , .expr (.methodCall (.var "script_parts") "append" [.str "cd $WORK_DIR"] [])
+  , .expr (.methodCall (.var "script_parts") "append"
+      [.call (.var "cmd_args") [.var "spago", .str " build"] [("delimiter", .str "")]] [])
+  , .expr (.methodCall (.var "script_parts") "append"
+      [.call (.var "cmd_args") [.var "spago", .str " bundle"] [("delimiter", .str "")]] [])
+  , .expr (.methodCall (.var "script_parts") "append" [.str "cd -"] [])
+  , .blank
+  , .comment "Assemble dist"
+  , .expr (.methodCall (.var "script_parts") "append"
+      [.call (.var "cmd_args") [.str "mkdir -p ", .methodCall (.var "dist_dir") "as_output" [] []] [("delimiter", .str "")]] [])
+  , .expr (.methodCall (.var "script_parts") "append"
+      [.call (.var "cmd_args") [.str "cp $WORK_DIR/app.js ", .methodCall (.var "dist_dir") "as_output" [] [], .str "/app.js"] [("delimiter", .str "")]] [])
+  , .ifStmt [(SExpr.ctxAttr "index_html", [
+      .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "cp ", SExpr.ctxAttr "index_html", .str " ", .methodCall (.var "dist_dir") "as_output" [] [], .str "/index.html"] [("delimiter", .str "")]] [])
+    ])] []
+  , .ifStmt [(SExpr.ctxAttr "style_css", [
+      .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "cp ", SExpr.ctxAttr "style_css", .str " ", .methodCall (.var "dist_dir") "as_output" [] [], .str "/style.css"] [("delimiter", .str "")]] [])
+    ])] []
+  , .blank
+  , .assign "script" (.call (.var "cmd_args") [.var "script_parts"] [("delimiter", .str "\n")])
+  , .assign "cmd" (.call (.var "cmd_args") [.str "/bin/sh", .str "-c", .var "script"] [])
+  , .blank
+  , .assign "hidden" (.call (.var "list") [SExpr.ctxAttr "srcs"] [])
+  , .ifStmt [(SExpr.ctxAttr "spago_yaml", [.expr (.methodCall (.var "hidden") "append" [SExpr.ctxAttr "spago_yaml"] [])])] []
+  , .ifStmt [(SExpr.ctxAttr "spago_dhall", [.expr (.methodCall (.var "hidden") "append" [SExpr.ctxAttr "spago_dhall"] [])])] []
+  , .ifStmt [(SExpr.ctxAttr "index_html", [.expr (.methodCall (.var "hidden") "append" [SExpr.ctxAttr "index_html"] [])])] []
+  , .ifStmt [(SExpr.ctxAttr "style_css", [.expr (.methodCall (.var "hidden") "append" [SExpr.ctxAttr "style_css"] [])])] []
+  , .blank
+  , .expr (SExpr.ctxAction "run" [.call (.var "cmd_args") [.var "cmd"] [("hidden", .var "hidden")]]
+      [("category", .str "spago_bundle"), ("identifier", SExpr.ctxAttr "name"), ("local_only", .bool true)])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [("default_output", .var "dist_dir")],
+      .call (.var "RunInfo") [] [("args", .call (.var "cmd_args") [.var "dist_dir"] [])]
+    ]) ]
+
+def purescriptSFile : SFile :=
+  { header := "# toolchains/purescript.bzl — generated by continuity\n#\n# PureScript compilation rules. Builder → AST → Render."
+  , items := [
+      .provider "PureScriptLibraryInfo"
+        [("output_dir", "Artifact | None, default = None"),
+         ("lib_name", "str, default = \"\""),
+         ("deps", "list, default = []")]
+    , .provider "PureScriptToolchainInfo"
+        [("purs", "str"),
+         ("spago", "str | None, default = None"),
+         ("node", "str | None, default = None")]
+    , .blank
+    -- Config helpers with validation
+    , .funcDef "_get_purs" [] (some "str") (some "Get purs from config.")
+        [ .assign "path" (SExpr.readConfigOpt "purescript" "purs")
+        , .ifStmt [(.cmp "==" (.var "path") .none,
+            [.expr (.call (.var "fail") [.strBlock "\npurs not configured.\nEnable in flake: continuity.toolchains.purescript = true;\nThen: direnv reload\n"] [])]
+          )] []
+        , .ret (.var "path") ]
+    , .funcDef "_get_spago" [] (some "str") (some "Get spago from config.")
+        [ .assign "path" (SExpr.readConfigOpt "purescript" "spago")
+        , .ifStmt [(.cmp "==" (.var "path") .none,
+            [.expr (.call (.var "fail") [.str "spago not configured. See [purescript] in .buckconfig"] [])]
+          )] []
+        , .ret (.var "path") ]
+    , .funcDef "_get_node" [] (some "str") (some "Get node from config.")
+        [.ret (SExpr.readConfig "purescript" "node" (.str "node"))]
+    , .funcDef "_get_esbuild" [] (some "str | None") (some "Get esbuild (optional).")
+        [.ret (SExpr.readConfigOpt "purescript" "esbuild")]
+    , .blank
+    -- purescript_app (the main rule for the consulting site)
+    , .funcDef "_purescript_app_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a PureScript web application with spago.")
+        psAppBody
+    , .ruleDef "purescript_app" "_purescript_app_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source(), default = [])")
+        , ("spago_yaml", .raw "attrs.option(attrs.source(), default = None)")
+        , ("spago_dhall", .raw "attrs.option(attrs.source(), default = None)")
+        , ("main", .raw "attrs.string(default = \"Main\")")
+        , ("index_html", .raw "attrs.option(attrs.source(), default = None)")
+        , ("style_css", .raw "attrs.option(attrs.source(), default = None)") ]
+    , .blank
+    -- purescript_toolchain
+    , .funcDef "_purescript_toolchain_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "PureScript toolchain with paths from .buckconfig.local.")
+        psToolchainBody
+    , .ruleDef "purescript_toolchain" "_purescript_toolchain_impl" true
+        [ ("purs", .raw "attrs.string(default = \"purs\")")
+        , ("spago", .raw "attrs.option(attrs.string(), default = None)")
+        , ("node", .raw "attrs.option(attrs.string(), default = None)") ]
+    ] }
+
+#eval (renderSFile purescriptSFile).length
+
 /- ════════════════════════════════════════════════════════════════════════════════
                                                        // all .bzl files
    ════════════════════════════════════════════════════════════════════════════════ -/
@@ -1482,6 +1632,7 @@ def bzlFiles : List (String × String) :=
   , ("toolchains/rust.bzl", renderSFile rustSFile)
   , ("toolchains/haskell.bzl", renderSFile haskellSFile)
   , ("toolchains/nv.bzl", renderSFile nvSFile)
+  , ("toolchains/purescript.bzl", renderSFile purescriptSFile)
   ]
 
 end Continuity.Codegen.Build.BzlDefs
