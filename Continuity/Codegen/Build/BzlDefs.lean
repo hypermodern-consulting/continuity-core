@@ -211,8 +211,239 @@ def cxxBzl : BzlFile :=
 
 #eval (renderBzlFile cxxBzl).length
 
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                              // lean.bzl (AST-based)
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+private def leanToolchainBody : List SStmt :=
+  [ .comment "Read from config, fall back to attrs"
+  , .assign "lean" (SExpr.readConfig "lean" "lean" (SExpr.ctxAttr "lean"))
+  , .assign "leanc" (SExpr.readConfig "lean" "leanc" (SExpr.ctxAttr "leanc"))
+  , .assign "lean_lib_dir"
+      (SExpr.readConfig "lean" "lean_lib_dir" (SExpr.ctxAttr "lean_lib_dir"))
+  , .assign "lean_include_dir"
+      (SExpr.readConfig "lean" "lean_include_dir" (SExpr.ctxAttr "lean_include_dir"))
+  , .blank
+  , .ret (.list [
+      SExpr.defaultInfo,
+      .call (.var "LeanToolchainInfo") [] [
+        ("lean", .var "lean"),
+        ("leanc", .var "leanc"),
+        ("lean_lib_dir", .var "lean_lib_dir"),
+        ("lean_include_dir", .var "lean_include_dir") ] ]) ]
+
+private def leanGetConfig (name sect key : String) (errMsg : Option String) : STop :=
+  .funcDef s!"_get_{name}" [] (some "str | None") (some s!"Get {name} from config.") [
+    .assign "path" (SExpr.readConfigOpt sect key),
+    .ifStmt [(.cmp "==" (.var "path") .none,
+      match errMsg with
+      | some msg => [.expr (.call (.var "fail") [.strBlock msg] [])]
+      | none     => [.ret .none]
+    )] [],
+    .ret (.var "path") ]
+
+private def leanBinaryBody : List SStmt :=
+  -- This is the complex one — multi-file Lean compilation + linking.
+  -- Uses shell script via cmd_args to handle LEAN_PATH, file copying, etc.
+  [ .assign "lean" (.call (.var "_get_lean") [] [])
+  , .assign "leanc" (.call (.var "_get_leanc") [] [])
+  , .assign "lean_lib_dir" (.call (.var "_get_lean_lib_dir") [] [])
+  , .blank
+  , .ifStmt [(.unop "not" (SExpr.ctxAttr "srcs"),
+      [.expr (.call (.var "fail") [.str "lean_binary requires at least one source file"] [])]
+    )] []
+  , .blank
+  , .comment "Output"
+  , .assign "exe" (SExpr.ctxAction "declare_output" [SExpr.ctxAttr "name"] [])
+  , .assign "olean_dir"
+      (SExpr.ctxAction "declare_output" [.str "olean"] [("dir", .bool true)])
+  , .assign "c_dir"
+      (SExpr.ctxAction "declare_output" [.str "c"] [("dir", .bool true)])
+  , .blank
+  , .comment "Collect dependency olean directories"
+  , .assign "dep_paths" (.list [])
+  , .forStmt "dep" (SExpr.ctxAttr "deps") [
+      .ifStmt [(.cmp "in" (.var "LeanLibraryInfo") (.var "dep"), [
+        .assign "info" (.index (.var "dep") (.var "LeanLibraryInfo")),
+        .ifStmt [(.dot (.var "info") "olean_dir", [
+          .expr (.methodCall (.var "dep_paths") "append" [.dot (.var "info") "olean_dir"] [])
+        ])] []
+      ])] []
+    ]
+  , .blank
+  , .comment "Build LEAN_PATH"
+  , .assign "lean_path_parts" (.list [.str "$OLEAN_DIR", .str "$BUCK_SCRATCH_PATH"])
+  , .ifStmt [(.var "lean_lib_dir", [
+      .expr (.methodCall (.var "lean_path_parts") "append" [.var "lean_lib_dir"] [])
+    ])] []
+  , .forStmt "dep_path" (.var "dep_paths") [
+      .expr (.methodCall (.var "lean_path_parts") "append"
+        [.call (.var "cmd_args") [.var "dep_path"] []] [])
+    ]
+  , .blank
+  , .comment "Build script: compile each source to C, then link with leanc"
+  , .assign "script_parts" (.list [.str "set -e"])
+  , .expr (.methodCall (.var "script_parts") "append" [.str "mkdir -p $OLEAN_DIR $C_DIR"] [])
+  , .blank
+  , .expr (.methodCall (.var "script_parts") "append" [
+      .call (.var "cmd_args") [
+        .str "export LEAN_PATH=",
+        .call (.var "cmd_args") [.var "lean_path_parts"]
+          [("delimiter", .str ":")]
+      ] [("delimiter", .str "")]
+    ] [])
+  , .blank
+  , .comment "Determine module structure"
+  , .assign "root_module" (SExpr.ctxAttr "root_module")
+  , .assign "c_files" (.list [])
+  , .assign "compile_order" (.list [])
+  , .assign "main_src" .none
+  , .blank
+  , .forStmt "src" (SExpr.ctxAttr "srcs") [
+      .ifStmt [(.cmp "==" (.dot (.var "src") "basename") (.str "Main.lean"), [
+        .assign "main_src" (.var "src")
+      ])] [
+        .expr (.methodCall (.var "compile_order") "append" [.var "src"] [])
+      ]
+    ]
+  , .ifStmt [(.var "main_src", [
+      .expr (.methodCall (.var "compile_order") "append" [.var "main_src"] [])
+    ])] [
+      .assign "main_src" (.index (SExpr.ctxAttr "srcs") (.int 0))
+    ]
+  , .blank
+  , .ifStmt [(.var "root_module", [
+      .expr (.methodCall (.var "script_parts") "append"
+        [.format "mkdir -p $BUCK_SCRATCH_PATH/{}" [.var "root_module"]] [])
+    ])] []
+  , .blank
+  , .comment "Copy and compile each source"
+  , .forStmt "src" (.var "compile_order") [
+      .assign "module_name"
+        (.methodCall (.dot (.var "src") "basename") "removesuffix" [.str ".lean"] [])
+    , .blank
+    , .ifStmt [
+        (.binop "and" (.var "root_module")
+          (.cmp "!=" (.dot (.var "src") "basename") (.str "Main.lean")), [
+          .assign "dest_path" (.format "$BUCK_SCRATCH_PATH/{}/{}" [.var "root_module", .dot (.var "src") "basename"])
+          , .assign "c_file" (.format "$C_DIR/{}.{}.c" [.var "root_module", .var "module_name"])
+          , .assign "olean_file" (.format "$OLEAN_DIR/{}/{}.olean" [.var "root_module", .var "module_name"])
+          , .expr (.methodCall (.var "script_parts") "append"
+              [.format "mkdir -p $OLEAN_DIR/{}" [.var "root_module"]] [])
+        ])] [
+          .assign "dest_path" (.format "$BUCK_SCRATCH_PATH/{}" [.dot (.var "src") "basename"])
+          , .assign "c_file" (.format "$C_DIR/{}.c" [.var "module_name"])
+          , .assign "olean_file" (.format "$OLEAN_DIR/{}.olean" [.var "module_name"])
+        ]
+    , .expr (.methodCall (.var "c_files") "append" [.var "c_file"] [])
+    , .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "cp", .var "src", .var "dest_path"] [("delimiter", .str " ")]] [])
+    , .assign "compile_cmd" (.list [
+        .var "lean", .str "--root=$BUCK_SCRATCH_PATH",
+        .str "-o", .var "olean_file",
+        .call (.var "cmd_args") [.str "--c=", .var "c_file"] [("delimiter", .str "")]])
+    , .expr (.methodCall (.var "compile_cmd") "extend" [SExpr.ctxAttr "lean_flags"] [])
+    , .expr (.methodCall (.var "compile_cmd") "append" [.var "dest_path"] [])
+    , .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.var "compile_cmd"] [("delimiter", .str " ")]] [])
+    ]
+  , .blank
+  , .comment "Link with leanc"
+  , .assign "link_cmd" (.list [.var "leanc", .str "-o", .methodCall (.var "exe") "as_output" [] []])
+  , .expr (.methodCall (.var "link_cmd") "extend" [SExpr.ctxAttr "link_flags"] [])
+  , .forStmt "c_file" (.var "c_files") [
+      .expr (.methodCall (.var "link_cmd") "append" [.var "c_file"] [])
+    ]
+  , .expr (.methodCall (.var "script_parts") "append"
+      [.call (.var "cmd_args") [.var "link_cmd"] [("delimiter", .str " ")]] [])
+  , .blank
+  , .assign "script" (.call (.var "cmd_args") [.var "script_parts"] [("delimiter", .str "\n")])
+  , .assign "cmd" (.call (.var "cmd_args") [
+      .str "/bin/sh", .str "-c",
+      .call (.var "cmd_args") [
+          .str "OLEAN_DIR=", .methodCall (.var "olean_dir") "as_output" [] [],
+          .str " C_DIR=", .methodCall (.var "c_dir") "as_output" [] [],
+          .str " && ", .var "script"]
+        [("delimiter", .str "")]
+    ] [])
+  , .blank
+  , .assign "hidden" (.call (.var "list") [SExpr.ctxAttr "srcs"] [])
+  , .expr (.methodCall (.var "hidden") "extend" [.var "dep_paths"] [])
+  , .blank
+  , .expr (SExpr.ctxAction "run" [
+      .call (.var "cmd_args") [.var "cmd"] [("hidden", .var "hidden")]
+    ] [("category", .str "lean_link"),
+       ("identifier", SExpr.ctxAttr "name"),
+       ("local_only", .bool true)])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [("default_output", .var "exe")],
+      .call (.var "RunInfo") [] [("args", .call (.var "cmd_args") [.var "exe"] [])]
+    ])
+  ]
+
+def leanSFile : SFile :=
+  { header := "# toolchains/lean.bzl — generated by continuity\n#\n# Lean 4 compilation rules. Builder → AST → Render."
+  , items := [
+      -- Providers
+      .provider "LeanLibraryInfo"
+        [("olean_dir", "Artifact | None, default = None"),
+         ("c_dir", "Artifact | None, default = None"),
+         ("lib_name", "str, default = \"\""),
+         ("deps", "list, default = []")]
+    , .provider "LeanToolchainInfo"
+        [("lean", "str"), ("leanc", "str"),
+         ("lean_lib_dir", "str | None, default = None"),
+         ("lean_include_dir", "str | None, default = None")]
+    , .blank
+    -- Config helpers
+    , leanGetConfig "lean" "lean" "lean"
+        (some "\nlean compiler not configured.\nConfigure via Nix .buckconfig.local [lean] section.\n")
+    , leanGetConfig "leanc" "lean" "leanc"
+        (some "leanc not configured. See [lean] section in .buckconfig")
+    , .funcDef "_get_lean_lib_dir" [] (some "str | None")
+        (some "Get Lean standard library directory.")
+        [.ret (SExpr.readConfigOpt "lean" "lean_lib_dir")]
+    , .funcDef "_get_lean_include_dir" [] (some "str | None")
+        (some "Get Lean C headers directory.")
+        [.ret (SExpr.readConfigOpt "lean" "lean_include_dir")]
+    , .blank
+    -- lean_binary
+    , .funcDef "_lean_binary_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a Lean executable with hierarchical module support.")
+        leanBinaryBody
+    , .ruleDef "lean_binary" "_lean_binary_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source(), default = [])")
+        , ("deps", .raw "attrs.list(attrs.dep(), default = [])")
+        , ("root_module", .raw "attrs.option(attrs.string(), default = None)")
+        , ("lean_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("link_flags", .raw "attrs.list(attrs.string(), default = [])") ]
+    , .blank
+    -- lean_toolchain
+    , .funcDef "_lean_toolchain_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Lean toolchain with paths from .buckconfig.local.")
+        leanToolchainBody
+    , .ruleDef "lean_toolchain" "_lean_toolchain_impl" true
+        [ ("lean", .raw "attrs.string(default = \"lean\")")
+        , ("leanc", .raw "attrs.string(default = \"leanc\")")
+        , ("lean_lib_dir", .raw "attrs.option(attrs.string(), default = None)")
+        , ("lean_include_dir", .raw "attrs.option(attrs.string(), default = None)") ]
+    ] }
+
+#eval (renderSFile leanSFile).length
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                       // all .bzl files
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
 def bzlFiles : List (String × String) :=
   [ ("toolchains/cxx.bzl", renderBzlFile cxxBzl)
+  , ("toolchains/lean.bzl", renderSFile leanSFile)
   ]
 
 end Continuity.Codegen.Build.BzlDefs
