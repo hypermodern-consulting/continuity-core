@@ -1,9 +1,0 @@
-genrule(
-    name = "varint-hs",
-    srcs = ["Varint.hs"],
-    out = "varint-hs",
-    bash = """
-        set -e
-        ghc -O -o $OUT $SRCS -no-keep-hi-files -no-keep-o-files -tmpdir /tmp
-    """,
-)

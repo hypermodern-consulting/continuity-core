@@ -1,8 +1,0 @@
-{
-  "lean": { "root": "/root/.elan/toolchains/leanprover--lean4---v4.30.0" },
-  "cxx":  { "cc": "/usr/bin/gcc", "cxx": "/usr/bin/g++" },
-  "haskell": { "ghc": "/usr/bin/ghc" },
-  "rust": null,
-  "nv": null,
-  "reapi": null
-}
