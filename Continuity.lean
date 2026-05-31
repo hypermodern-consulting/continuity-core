@@ -49,6 +49,7 @@ import Continuity.Build.Rule
 import Continuity.Build.BzlFile
 import Continuity.Codegen.Build.ToDhall
 import Continuity.Codegen.Build.ToStarlark
+import Continuity.Codegen.Build.BzlDefs
 import Continuity.Codegen.Codec.Spec
 import Continuity.Codegen.Codec.ToCpp
 import Continuity.Codegen.Codec.ToHaskell

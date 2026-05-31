@@ -1,6 +1,7 @@
 import Continuity.Derivation
 import Continuity.Codegen.Build.ToDhall
 import Continuity.Codegen.Build.ToStarlark
+import Continuity.Codegen.Build.BzlDefs
 import Continuity.Codegen.Codec.ToCpp
 import Continuity.Codegen.Codec.ToHaskell
 import Continuity.InitBuck2
@@ -9,6 +10,7 @@ import Continuity.Crypto.SHA256
 
 open Continuity.Codegen.Build
 open Continuity.Codegen.Build.Starlark
+open Continuity.Codegen.Build.BzlDefs
 open Continuity.Codegen.Codec
 open Continuity.Emit.Dhall
 open Continuity.Emit.Starlark
@@ -53,6 +55,14 @@ def cmdGenerate (outDir : String) : IO Unit := do
   let starlarkOut := Continuity.Codegen.Build.Starlark.starlarkFiles
     Continuity.Codegen.Build.Starlark.allToolchains
   for (path, content) in starlarkOut do
+    let fullPath := s!"{outDir}/{path}"
+    let dir := System.FilePath.mk fullPath |>.parent |>.getD (System.FilePath.mk ".")
+    IO.FS.createDirAll dir
+    IO.FS.writeFile fullPath content
+    IO.println s!"  wrote {path}"
+
+  -- .bzl rule files (generated from BzlFile definitions)
+  for (path, content) in Continuity.Codegen.Build.BzlDefs.bzlFiles do
     let fullPath := s!"{outDir}/{path}"
     let dir := System.FilePath.mk fullPath |>.parent |>.getD (System.FilePath.mk ".")
     IO.FS.createDirAll dir

@@ -62,6 +62,7 @@ lean_library(
         "Continuity/InitBuck2.lean",
         "Continuity/Codegen/Build/ToDhall.lean",
         "Continuity/Codegen/Build/ToStarlark.lean",
+        "Continuity/Codegen/Build/BzlDefs.lean",
         "Continuity/Codegen/Effect.lean",
         "Continuity/Codegen/Codec/Spec.lean",
         "Continuity/Codegen/Codec/ToCpp.lean",

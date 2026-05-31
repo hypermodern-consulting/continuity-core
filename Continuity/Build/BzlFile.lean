@@ -38,6 +38,7 @@ inductive AttrType where
   | output
   | label
   | stringDict
+  | raw (text : String)  -- pre-rendered attr type, for edge cases
   deriving Repr, Inhabited
 
 structure Attr where

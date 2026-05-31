@@ -110,6 +110,7 @@ private def renderAttrType : AttrType → String
   | .output            => "attrs.output()"
   | .label             => "attrs.label()"
   | .stringDict        => "attrs.dict(key = attrs.string(), value = attrs.string(), default = {})"
+  | .raw text           => text
 
 private def renderAttr (a : Attr) : String :=
   s!"\"{a.name}\": {renderAttrType a.type}"
