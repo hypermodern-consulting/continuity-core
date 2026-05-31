@@ -63,7 +63,13 @@
       buckconfig = import ./buckconfig.nix {
         inherit pkgs lib lean4;
         toolchains = cfg.toolchains;
+        libraries = cfg.libraries;
       };
+
+      # GHC with packages from library spec (same one buckconfig uses)
+      ghcWithLibs = if cfg.libraries.haskell == [] then pkgs.ghc
+        else pkgs.haskellPackages.ghcWithPackages (ps:
+          map (name: ps.${name}) cfg.libraries.haskell);
 
       toolchainPackages = lib.concatLists [
         (lib.optional cfg.toolchains.lean       lean4)
@@ -72,7 +78,7 @@
           pkgs.llvmPackages_19.lld
           pkgs.gcc  # still needed for libstdc++
         ])
-        (lib.optional cfg.toolchains.haskell    pkgs.ghc)
+        (lib.optional cfg.toolchains.haskell    ghcWithLibs)
         (lib.optional cfg.toolchains.haskell    pkgs.cabal-install)
         (lib.optional cfg.toolchains.rust       pkgs.rustc)
         (lib.optional cfg.toolchains.rust       pkgs.cargo)
@@ -108,6 +114,29 @@
             });
             default = null;
             description = "Remote execution API configuration.";
+          };
+        };
+
+        libraries = {
+          haskell = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "Haskell packages to include in ghcWithPackages.";
+            example = [ "aeson" "text" "bytestring" "crypton" ];
+          };
+          cxx = mkOption {
+            type = types.listOf (types.submodule {
+              options = {
+                name = mkOption { type = types.str; description = "Target name in //third-party:name"; };
+                pkg  = mkOption { type = types.str; description = "nixpkgs attribute name"; };
+                libs = mkOption { type = types.listOf types.str; default = []; description = "Link flags"; };
+              };
+            });
+            default = [];
+            description = "C/C++ libraries resolved from nixpkgs.";
+            example = [
+              { name = "curl"; pkg = "curl"; libs = ["-lcurl"]; }
+            ];
           };
         };
 

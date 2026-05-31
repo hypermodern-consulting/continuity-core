@@ -54,6 +54,16 @@
           purescript = true;
         };
 
+        continuity.libraries = {
+          haskell = [ "crypton" "memory" "aeson" "text" "bytestring" ];
+          cxx = [
+            { name = "curl"; pkg = "curl"; libs = ["-lcurl"]; }
+            { name = "zlib"; pkg = "zlib"; libs = ["-lz"]; }
+            { name = "openssl"; pkg = "openssl"; libs = ["-lssl" "-lcrypto"]; }
+            { name = "simdjson"; pkg = "simdjson"; libs = ["-lsimdjson"]; }
+          ];
+        };
+
         packages = {
           default = config.continuity.binary;
           inherit (config.continuity) binary generated lean4 buckconfig;
