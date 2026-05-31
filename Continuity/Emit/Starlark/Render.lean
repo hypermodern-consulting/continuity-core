@@ -1,4 +1,5 @@
 import Continuity.Build.BzlFile
+import Continuity.Emit.Starlark.Ast
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                            // continuity // emit // starlark
@@ -208,6 +209,136 @@ def renderBuckFile (b : BuckFile) : String :=
      else String.intercalate "\n\n" (b.calls.map renderToolchainCall))
   ]
   String.intercalate "\n\n" sections ++ "\n"
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                                   // AST-based renderer
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+/-! Render SFile → String. Builder → AST → Render. -/
+
+mutual
+
+partial def renderSExpr : SExpr → String
+  | .str s        => renderStrLit s
+  | .strBlock s   => s!"\"\"\"{ s}\"\"\""
+  | .int n        => toString n
+  | .bool true    => "True"
+  | .bool false   => "False"
+  | .none         => "None"
+  | .var name     => name
+  | .dot e field  => s!"{renderSExpr e}.{field}"
+  | .index e key  => s!"{renderSExpr e}[{renderSExpr key}]"
+  | .call func args kwargs =>
+    let posArgs := args.map renderSExpr
+    let kwArgs  := kwargs.map fun (k, v) => s!"{k} = {renderSExpr v}"
+    let allArgs := posArgs ++ kwArgs
+    s!"{renderSExpr func}({String.intercalate ", " allArgs})"
+  | .methodCall obj method args kwargs =>
+    let posArgs := args.map renderSExpr
+    let kwArgs  := kwargs.map fun (k, v) => s!"{k} = {renderSExpr v}"
+    let allArgs := posArgs ++ kwArgs
+    s!"{renderSExpr obj}.{method}({String.intercalate ", " allArgs})"
+  | .list elements =>
+    if elements.isEmpty then "[]"
+    else s!"[{String.intercalate ", " (elements.map renderSExpr)}]"
+  | .dict entries =>
+    if entries.isEmpty then "{}"
+    else
+      let pairs := entries.map fun (k, v) => s!"{renderSExpr k}: {renderSExpr v}"
+      s!"\{{String.intercalate ", " pairs}}"
+  | .binop op lhs rhs => s!"{renderSExpr lhs} {op} {renderSExpr rhs}"
+  | .unop op e        => s!"{op} {renderSExpr e}"
+  | .cmp op lhs rhs   => s!"{renderSExpr lhs} {op} {renderSExpr rhs}"
+  | .ternary t c e     => s!"{renderSExpr t} if {renderSExpr c} else {renderSExpr e}"
+  | .concat parts      => String.intercalate " + " (parts.map renderSExpr)
+  | .format tmpl args  =>
+    let argStr := String.intercalate ", " (args.map renderSExpr)
+    s!"{renderStrLit tmpl}.format({argStr})"
+  | .raw text          => text
+
+partial def renderSStmt (indent : Nat) : SStmt → String
+  | .assign target value =>
+    s!"{pad indent}{target} = {renderSExpr value}"
+  | .augAssign target op value =>
+    s!"{pad indent}{target} {op} {renderSExpr value}"
+  | .expr value =>
+    s!"{pad indent}{renderSExpr value}"
+  | .ret value =>
+    s!"{pad indent}return {renderSExpr value}"
+  | .ifStmt branches elseBranch =>
+    let renderBranch (isFirst : Bool) (cond : SExpr) (body : List SStmt) : String :=
+      let keyword := if isFirst then "if" else "elif"
+      let header := s!"{pad indent}{keyword} {renderSExpr cond}:"
+      let bodyStr := String.intercalate "\n" (body.map (renderSStmt (indent + 4)))
+      s!"{header}\n{bodyStr}"
+    let branchStrs := match branches with
+      | [] => []
+      | (cond, body) :: rest =>
+        let first := renderBranch true cond body
+        let others := rest.map fun (c, b) => renderBranch false c b
+        first :: others
+    let elseStr := if elseBranch.isEmpty then ""
+      else s!"\n{pad indent}else:\n{String.intercalate "\n" (elseBranch.map (renderSStmt (indent + 4)))}"
+    String.intercalate "\n" branchStrs ++ elseStr
+  | .forStmt var_ iterable body =>
+    let header := s!"{pad indent}for {var_} in {renderSExpr iterable}:"
+    let bodyStr := String.intercalate "\n" (body.map (renderSStmt (indent + 4)))
+    s!"{header}\n{bodyStr}"
+  | .comment text =>
+    s!"{pad indent}# {text}"
+  | .blank => ""
+  | .raw text =>
+    s!"{pad indent}{text}"
+
+end
+
+private def renderSParam (p : SParam) : String :=
+  let typeStr := match p.type with
+    | some t => s!": {t}"
+    | none   => ""
+  let defaultStr := match p.default with
+    | some d => s!" = {renderSExpr d}"
+    | none   => ""
+  s!"{p.name}{typeStr}{defaultStr}"
+
+private def renderSTop : STop → String
+  | .load path symbols =>
+    let syms := String.intercalate ", " (symbols.map renderStrLit)
+    s!"load({renderStrLit path}, {syms})"
+  | .globalAssign name value =>
+    s!"{name} = {renderSExpr value}"
+  | .provider name fields =>
+    let fieldStrs := fields.map fun (fname, ftype) =>
+      s!"    \"{fname}\": provider_field({ftype}),"
+    s!"{name} = provider(fields = \{\n{String.intercalate "\n" fieldStrs}\n})"
+  | .funcDef name params retType doc body =>
+    let paramStr := String.intercalate ", " (params.map renderSParam)
+    let retStr := match retType with
+      | some t => s!" -> {t}"
+      | none   => ""
+    let docStr := match doc with
+      | some d => s!"\n    \"\"\"\n    {d}\n    \"\"\""
+      | none   => ""
+    let bodyStr := String.intercalate "\n" (body.map (renderSStmt 4))
+    s!"def {name}({paramStr}){retStr}:{docStr}\n{bodyStr}"
+  | .ruleDef name implName isToolchain attrs =>
+    let attrLines := attrs.map fun (aname, aexpr) =>
+      s!"        \"{aname}\": {renderSExpr aexpr},"
+    let attrBlock := String.intercalate "\n" attrLines
+    let tcStr := if isToolchain then "\n    is_toolchain_rule = True," else ""
+    s!"{name} = rule(\n    impl = {implName},{tcStr}\n    attrs = \{\n{attrBlock}\n    },\n)"
+  | .comment text =>
+    let commentLines := text.splitOn "\n"
+    String.intercalate "\n" (commentLines.map fun l => s!"# {l}")
+  | .blank => ""
+
+/-- Render a complete .bzl file from AST. -/
+def renderSFile (f : SFile) : String :=
+  let headerStr := if f.header.isEmpty then [] else [f.header]
+  let itemStrs := f.items.map renderSTop
+  let sections := headerStr ++ itemStrs
+  String.intercalate "\n\n" (sections.filter (· ≠ "")) ++ "\n"
 
 
 end Continuity.Emit.Starlark

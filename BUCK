@@ -12,6 +12,7 @@ lean_library(
         "Continuity/Emit/Cpp/Ast.lean",
         "Continuity/Emit/Cpp/Render.lean",
         "Continuity/Emit/Cpp/Build.lean",
+        "Continuity/Emit/Starlark/Ast.lean",
         "Continuity/Emit/Starlark/Render.lean",
         "Continuity/Crypto.lean",
         "Continuity/Crypto/SHA256.lean",

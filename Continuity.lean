@@ -8,6 +8,7 @@ import Continuity.Emit.Haskell.Build
 import Continuity.Emit.Cpp.Ast
 import Continuity.Emit.Cpp.Render
 import Continuity.Emit.Cpp.Build
+import Continuity.Emit.Starlark.Ast
 import Continuity.Emit.Starlark.Render
 import Continuity.Codec.Box
 import Continuity.Codec.Scanner
