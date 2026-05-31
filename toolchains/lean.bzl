@@ -85,14 +85,20 @@ def _lean_library_impl(ctx: AnalysisContext) -> list[Provider]:
 
     # Compile each source
     for src in ctx.attrs.srcs:
-        module_name = src.basename.removesuffix(".lean")
-        script_parts.append(cmd_args("cp", src, "$BUCK_SCRATCH_PATH/", delimiter = " "))
+        # Preserve directory structure for hierarchical modules
+        src_path = src.short_path
+        olean_path = src_path.removesuffix(".lean") + ".olean"
+        script_parts.append(cmd_args("mkdir -p $(dirname $BUCK_SCRATCH_PATH/", src_path, ")", delimiter = ""))
+        script_parts.append(cmd_args("cp", src, cmd_args("$BUCK_SCRATCH_PATH/", src_path, delimiter = ""), delimiter = " "))
+        script_parts.append(cmd_args("mkdir -p $(dirname $OLEAN_DIR/", olean_path, ")", delimiter = ""))
         compile_cmd = [lean, "--root=$BUCK_SCRATCH_PATH"]
         compile_cmd.extend(ctx.attrs.lean_flags)
-        compile_cmd.extend(["-o", cmd_args("$OLEAN_DIR/", module_name, ".olean", delimiter = "")])
+        compile_cmd.extend(["-o", cmd_args("$OLEAN_DIR/", olean_path, delimiter = "")])
         if c_dir:
-            compile_cmd.append(cmd_args("--c=$C_DIR/", module_name, ".c", delimiter = ""))
-        compile_cmd.append(cmd_args("$BUCK_SCRATCH_PATH/", src.basename, delimiter = ""))
+            c_path = src_path.removesuffix(".lean") + ".c"
+            script_parts.append(cmd_args("mkdir -p $(dirname $C_DIR/", c_path, ")", delimiter = ""))
+            compile_cmd.append(cmd_args("--c=$C_DIR/", c_path, delimiter = ""))
+        compile_cmd.append(cmd_args("$BUCK_SCRATCH_PATH/", src_path, delimiter = ""))
         script_parts.append(cmd_args(compile_cmd, delimiter = " "))
 
     script = cmd_args(script_parts, delimiter = "\n")

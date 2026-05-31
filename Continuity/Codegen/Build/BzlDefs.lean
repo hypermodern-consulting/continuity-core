@@ -292,26 +292,46 @@ private def leanLibraryBody : List SStmt :=
   , .blank
   , .comment "Compile each source"
   , .forStmt "src" (SExpr.ctxAttr "srcs") [
-      .assign "module_name"
-        (.methodCall (.dot (.var "src") "basename") "removesuffix" [.str ".lean"] [])
+      .comment "Preserve directory structure for hierarchical modules"
+    , .assign "src_path" (.dot (.var "src") "short_path")
+    , .assign "olean_path" (.binop "+"
+        (.methodCall (.var "src_path") "removesuffix" [.str ".lean"] [])
+        (.str ".olean"))
     , .expr (.methodCall (.var "script_parts") "append"
-        [.call (.var "cmd_args") [.str "cp", .var "src", .str "$BUCK_SCRATCH_PATH/"]
+        [.call (.var "cmd_args") [.str "mkdir -p $(dirname $BUCK_SCRATCH_PATH/",
+          .var "src_path", .str ")"]
+          [("delimiter", .str "")]] [])
+    , .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "cp", .var "src",
+          .call (.var "cmd_args") [.str "$BUCK_SCRATCH_PATH/", .var "src_path"]
+            [("delimiter", .str "")]]
           [("delimiter", .str " ")]] [])
+    , .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "mkdir -p $(dirname $OLEAN_DIR/",
+          .var "olean_path", .str ")"]
+          [("delimiter", .str "")]] [])
     , .assign "compile_cmd" (.list [
         .var "lean", .str "--root=$BUCK_SCRATCH_PATH"])
     , .expr (.methodCall (.var "compile_cmd") "extend" [SExpr.ctxAttr "lean_flags"] [])
     , .expr (.methodCall (.var "compile_cmd") "extend" [.list [
         .str "-o",
-        .call (.var "cmd_args") [.str "$OLEAN_DIR/", .var "module_name", .str ".olean"]
+        .call (.var "cmd_args") [.str "$OLEAN_DIR/", .var "olean_path"]
           [("delimiter", .str "")]
       ]] [])
     , .ifStmt [(.var "c_dir", [
-        .expr (.methodCall (.var "compile_cmd") "append"
-          [.call (.var "cmd_args") [.str "--c=$C_DIR/", .var "module_name", .str ".c"]
+        .assign "c_path" (.binop "+"
+            (.methodCall (.var "src_path") "removesuffix" [.str ".lean"] [])
+            (.str ".c"))
+      , .expr (.methodCall (.var "script_parts") "append"
+          [.call (.var "cmd_args") [.str "mkdir -p $(dirname $C_DIR/",
+            .var "c_path", .str ")"]
+            [("delimiter", .str "")]] [])
+      , .expr (.methodCall (.var "compile_cmd") "append"
+          [.call (.var "cmd_args") [.str "--c=$C_DIR/", .var "c_path"]
             [("delimiter", .str "")]] [])
       ])] []
     , .expr (.methodCall (.var "compile_cmd") "append"
-        [.call (.var "cmd_args") [.str "$BUCK_SCRATCH_PATH/", .dot (.var "src") "basename"]
+        [.call (.var "cmd_args") [.str "$BUCK_SCRATCH_PATH/", .var "src_path"]
           [("delimiter", .str "")]] [])
     , .expr (.methodCall (.var "script_parts") "append"
         [.call (.var "cmd_args") [.var "compile_cmd"] [("delimiter", .str " ")]] [])
