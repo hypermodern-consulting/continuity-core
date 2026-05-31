@@ -208,18 +208,11 @@ def cxxBzl : BzlFile :=
    ════════════════════════════════════════════════════════════════════════════════ -/
 
 -- Verify the generated cxx.bzl compiles to valid Starlark
+
 #eval (renderBzlFile cxxBzl).length
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                       // all .bzl files
-   ════════════════════════════════════════════════════════════════════════════════ -/
-
-/-- All generated .bzl files. Returns (path, content) pairs. -/
 def bzlFiles : List (String × String) :=
   [ ("toolchains/cxx.bzl", renderBzlFile cxxBzl)
-  -- TODO: lean.bzl, haskell.bzl, rust.bzl, nv.bzl, purescript.bzl
   ]
-
 
 end Continuity.Codegen.Build.BzlDefs

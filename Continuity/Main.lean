@@ -61,13 +61,25 @@ def cmdGenerate (outDir : String) : IO Unit := do
     IO.FS.writeFile fullPath content
     IO.println s!"  wrote {path}"
 
-  -- .bzl rule files (generated from BzlFile definitions)
+  -- .bzl rule files (generated from BzlFile definitions in Lean)
   for (path, content) in Continuity.Codegen.Build.BzlDefs.bzlFiles do
     let fullPath := s!"{outDir}/{path}"
     let dir := System.FilePath.mk fullPath |>.parent |>.getD (System.FilePath.mk ".")
     IO.FS.createDirAll dir
     IO.FS.writeFile fullPath content
-    IO.println s!"  wrote {path}"
+    IO.println s!"  wrote {path} (generated)"
+
+  -- .bzl files not yet migrated to BzlFile definitions (read from disk)
+  let diskBzl := ["lean.bzl", "haskell.bzl", "rust.bzl", "nv.bzl",
+                   "purescript.bzl", "rust_crate.bzl", "execution.bzl",
+                   "cuda.bzl", "nix.bzl", "python.bzl"]
+  for bzl in diskBzl do
+    let srcPath := s!"toolchains/{bzl}"
+    let dstPath := s!"{outDir}/toolchains/{bzl}"
+    let content ← IO.FS.readFile srcPath <|> pure ""
+    if !content.isEmpty then
+      IO.FS.writeFile dstPath content
+      IO.println s!"  wrote toolchains/{bzl} (copied)"
 
   -- Reflective hash prediction (§5 of the paper):
   -- Compute h1 = SHA-256(concatenated output) using the verified Lean implementation.
