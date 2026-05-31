@@ -1,5 +1,0 @@
-[lean]
-lean = /root/.nix-profile/bin/lean
-leanc = /root/.nix-profile/bin/leanc
-lean_lib_dir = /root/.nix-profile/lib/lean/library
-lean_include_dir = /root/.nix-profile/include

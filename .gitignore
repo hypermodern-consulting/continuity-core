@@ -31,3 +31,4 @@ output/
 # Haskell build artifacts
 *.hi
 *.o
+.buckconfig.local
