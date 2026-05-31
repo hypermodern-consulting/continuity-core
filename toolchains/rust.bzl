@@ -16,8 +16,8 @@
 # they'll need the upstream provider type.
 load("@prelude//rust:rust_toolchain.bzl", "PanicRuntime", "RustToolchainInfo")
 
-# Import RustCrateInfo so we can handle deps from crates_io()
-load("@toolchains//rust_crate.bzl", "RustCrateInfo")
+# Stub provider for crate deps — full impl in rust_crate.bzl (requires http_archive)
+RustCrateInfo = provider(fields = ["rlib", "rmeta", "crate_name"])
 
 # Provider for rust library outputs
 RustLibraryInfo = provider(fields = [
