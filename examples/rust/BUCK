@@ -2,12 +2,8 @@
 #
 # Rust examples using hermetic Nix toolchain
 #
-# Demonstrates:
-#   - rust_binary: standalone executable
-#   - rust_library: reusable library crate
-#   - Dependency chaining between targets
-
-load("@toolchains//:rust.bzl", "rust_binary", "rust_library")
+# Uses prelude's rust_binary/rust_library with system_rust_toolchain.
+# No custom .bzl needed — the prelude handles everything.
 
 # Simple hello world binary
 rust_binary(

@@ -54,17 +54,20 @@ def mkToolchainsBuck (config : ToolchainConfig) : BuckFile :=
 
   -- Collect loads
   let loads : List Load := List.filter (fun l => !l.symbols.isEmpty) [
-    -- System toolchains from prelude
+    -- System toolchains from prelude (always compatible with current prelude)
     ⟨"@prelude//toolchains:genrule.bzl", ["system_genrule_toolchain"]⟩,
     ⟨"@prelude//toolchains:python.bzl", ["system_python_bootstrap_toolchain"]⟩,
-    -- CXX from prelude (handles CxxToolchainInfo compatibility)
     (if config.cxx then
       ⟨"@prelude//toolchains:cxx.bzl", ["system_cxx_toolchain"]⟩
     else ⟨"", []⟩),
-    -- Custom toolchains
+    (if config.haskell then
+      ⟨"@prelude//toolchains:haskell.bzl", ["system_haskell_toolchain"]⟩
+    else ⟨"", []⟩),
+    (if config.rust then
+      ⟨"@prelude//toolchains:rust.bzl", ["system_rust_toolchain"]⟩
+    else ⟨"", []⟩),
+    -- Custom toolchains (languages the prelude doesn't support)
     (if config.lean then ⟨":lean.bzl", ["lean_toolchain"]⟩ else ⟨"", []⟩),
-    (if config.haskell then ⟨":haskell.bzl", ["haskell_toolchain"]⟩ else ⟨"", []⟩),
-    (if config.rust then ⟨":rust.bzl", ["rust_toolchain"]⟩ else ⟨"", []⟩),
     (if config.nv then ⟨":nv.bzl", ["nv_toolchain"]⟩ else ⟨"", []⟩),
     (if config.purescript then ⟨":purescript.bzl", ["purescript_toolchain"]⟩ else ⟨"", []⟩)
   ]
@@ -75,7 +78,7 @@ def mkToolchainsBuck (config : ToolchainConfig) : BuckFile :=
     -- System toolchains
     ⟨"system_python_bootstrap_toolchain", "python_bootstrap", [], pub⟩,
     ⟨"system_genrule_toolchain", "genrule", [], pub⟩,
-    -- CXX via prelude (always compatible with current prelude version)
+    -- CXX via prelude
     (if config.cxx then
       ⟨"system_cxx_toolchain", "cxx",
         [("compiler_type", "\"clang\""),
@@ -83,26 +86,24 @@ def mkToolchainsBuck (config : ToolchainConfig) : BuckFile :=
          ("c_flags", "[\"-std=c23\", \"-Wall\", \"-Wextra\"]"),
          ("link_style", "\"static\"")], pub⟩
     else ⟨"", "", [], pub⟩),
-    -- Lean
+    -- Haskell via prelude
+    (if config.haskell then
+      ⟨"system_haskell_toolchain", "haskell", [], pub⟩
+    else ⟨"", "", [], pub⟩),
+    -- Rust via prelude
+    (if config.rust then
+      ⟨"system_rust_toolchain", "rust", [], pub⟩
+    else ⟨"", "", [], pub⟩),
+    -- Custom: Lean (not in prelude)
     (if config.lean then
       ⟨"lean_toolchain", "lean", [], pub⟩
     else ⟨"", "", [], pub⟩),
-    -- Haskell
-    (if config.haskell then
-      ⟨"haskell_toolchain", "haskell",
-        [("compiler_flags", "[\"-Wall\", \"-XGHC2024\"]")], pub⟩
-    else ⟨"", "", [], pub⟩),
-    -- Rust
-    (if config.rust then
-      ⟨"rust_toolchain", "rust",
-        [("default_edition", "\"2021\"")], pub⟩
-    else ⟨"", "", [], pub⟩),
-    -- NV
+    -- Custom: NV (not in prelude)
     (if config.nv then
       ⟨"nv_toolchain", "nv",
         [("nv_archs", "[\"sm_90\", \"sm_100\", \"sm_120\"]")], pub⟩
     else ⟨"", "", [], pub⟩),
-    -- PureScript
+    -- Custom: PureScript (not in prelude)
     (if config.purescript then
       ⟨"purescript_toolchain", "purescript", [], pub⟩
     else ⟨"", "", [], pub⟩)

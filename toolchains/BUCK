@@ -5,9 +5,9 @@
 load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
 load("@prelude//toolchains:python.bzl", "system_python_bootstrap_toolchain")
 load("@prelude//toolchains:cxx.bzl", "system_cxx_toolchain")
+load("@prelude//toolchains:haskell.bzl", "system_haskell_toolchain")
+load("@prelude//toolchains:rust.bzl", "system_rust_toolchain")
 load(":lean.bzl", "lean_toolchain")
-load(":haskell.bzl", "haskell_toolchain")
-load(":rust.bzl", "rust_toolchain")
 load(":nv.bzl", "nv_toolchain")
 load(":purescript.bzl", "purescript_toolchain")
 
@@ -30,20 +30,18 @@ system_cxx_toolchain(
     visibility = ["PUBLIC"],
 )
 
+system_haskell_toolchain(
+    name = "haskell",
+    visibility = ["PUBLIC"],
+)
+
+system_rust_toolchain(
+    name = "rust",
+    visibility = ["PUBLIC"],
+)
+
 lean_toolchain(
     name = "lean",
-    visibility = ["PUBLIC"],
-)
-
-haskell_toolchain(
-    name = "haskell",
-    compiler_flags = ["-Wall", "-XGHC2024"],
-    visibility = ["PUBLIC"],
-)
-
-rust_toolchain(
-    name = "rust",
-    default_edition = "2021",
     visibility = ["PUBLIC"],
 )
 
