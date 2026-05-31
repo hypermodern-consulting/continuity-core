@@ -437,6 +437,204 @@ def leanSFile : SFile :=
 
 #eval (renderSFile leanSFile).length
 
+
+/- ════════════════════════════════════════════════════════════════════════════════
+                                              // rust.bzl (AST-based)
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+private def rustToolchainBody : List SStmt :=
+  [ .assign "rustc" (SExpr.readConfig "rust" "rustc" (.str "rustc"))
+  , .assign "rustdoc" (SExpr.readConfig "rust" "rustdoc" (.str "rustdoc"))
+  , .assign "clippy_driver"
+      (SExpr.readConfig "rust" "clippy_driver" (.str "clippy-driver"))
+  , .assign "target_triple"
+      (SExpr.readConfig "rust" "target_triple" (.str "x86_64-unknown-linux-gnu"))
+  , .blank
+  , .ret (.list [
+      SExpr.defaultInfo,
+      .call (.var "RustToolchainInfo") [] [
+        ("compiler", SExpr.runInfo (.list [.var "rustc"])),
+        ("rustdoc", SExpr.runInfo (.list [.var "rustdoc"])),
+        ("clippy_driver", SExpr.runInfo (.list [.var "clippy_driver"])),
+        ("rustc_target_triple", .var "target_triple"),
+        ("default_edition", SExpr.ctxAttr "default_edition"),
+        ("panic_runtime", .call (.var "PanicRuntime") [SExpr.ctxAttr "panic_runtime"] []),
+        ("rustc_flags", SExpr.ctxAttr "rustc_flags"),
+        ("rustc_binary_flags", SExpr.ctxAttr "rustc_binary_flags"),
+        ("rustc_test_flags", SExpr.ctxAttr "rustc_test_flags"),
+        ("rustdoc_flags", SExpr.ctxAttr "rustdoc_flags"),
+        ("allow_lints", SExpr.ctxAttr "allow_lints"),
+        ("deny_lints", SExpr.ctxAttr "deny_lints"),
+        ("warn_lints", SExpr.ctxAttr "warn_lints"),
+        ("report_unused_deps", SExpr.ctxAttr "report_unused_deps"),
+        ("doctests", SExpr.ctxAttr "doctests") ] ]) ]
+
+private def rustBinaryBody : List SStmt :=
+  [ .assign "rustc" (SExpr.readConfig "rust" "rustc" (.str "rustc"))
+  , .assign "out" (SExpr.ctxAction "declare_output" [SExpr.ctxAttr "name"] [])
+  , .assign "cmd" (.call (.var "cmd_args") [.list [.var "rustc"]] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "--edition", SExpr.ctxAttr "edition"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-O"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-o", .methodCall (.var "out") "as_output" [] []] [])
+  , .blank
+  , .comment "Collect deps (rlibs)"
+  , .forStmt "dep" (SExpr.ctxAttr "deps") [
+      .ifStmt [(.cmp "in" (.var "RustLibraryInfo") (.var "dep"), [
+        .assign "lib_info" (.index (.var "dep") (.var "RustLibraryInfo"))
+      , .expr (.methodCall (.var "cmd") "add"
+          [.call (.var "cmd_args") [.str "--extern",
+            .call (.var "cmd_args") [.dot (.var "lib_info") "crate_name", .str "=", .dot (.var "lib_info") "rlib"]
+              [("delimiter", .str "")]] []] [])
+      , .expr (.methodCall (.var "cmd") "add"
+          [.call (.var "cmd_args") [.dot (.var "lib_info") "rlib"]
+            [("format", .str "-Ldependency={}"), ("parent", .int 1)]] [])
+      , .forStmt "trans_rlib" (.dot (.var "lib_info") "transitive_deps") [
+          .expr (.methodCall (.var "cmd") "add"
+            [.call (.var "cmd_args") [.var "trans_rlib"]
+              [("format", .str "-Ldependency={}"), ("parent", .int 1)]] [])
+        ]
+      ])] []
+    ]
+  , .blank
+  , .comment "Binary root is the first source file"
+  , .ifStmt [(SExpr.ctxAttr "srcs", [
+      .expr (.methodCall (.var "cmd") "add" [.index (SExpr.ctxAttr "srcs") (.int 0)] [])
+    , .ifStmt [(.cmp ">" (.call (.var "len") [SExpr.ctxAttr "srcs"] []) (.int 1), [
+        .expr (.methodCall (.var "cmd") "add"
+          [.call (.var "cmd_args") [] [("hidden", .raw "ctx.attrs.srcs[1:]")]] [])
+      ])] []
+    ])] []
+  , .blank
+  , .expr (SExpr.ctxAction "run" [.var "cmd"] [("category", .str "rustc")])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [("default_output", .var "out")],
+      .call (.var "RunInfo") [] [("args", .call (.var "cmd_args") [.var "out"] [])]
+    ]) ]
+
+private def rustLibraryBody : List SStmt :=
+  [ .assign "rustc" (SExpr.readConfig "rust" "rustc" (.str "rustc"))
+  , .assign "crate_name" (.binop "or" (SExpr.ctxAttr "crate_name") (SExpr.ctxAttr "name"))
+  , .blank
+  , .ifStmt [(SExpr.ctxAttr "proc_macro", [
+      .assign "out" (SExpr.ctxAction "declare_output" [.format "lib{}.so" [.var "crate_name"]] [])
+    , .assign "crate_type" (.str "proc-macro")
+    ])] [
+      .assign "out" (SExpr.ctxAction "declare_output" [.format "lib{}.rlib" [.var "crate_name"]] [])
+    , .assign "crate_type" (.str "rlib")
+    ]
+  , .blank
+  , .assign "cmd" (.call (.var "cmd_args") [.list [.var "rustc"]] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "--crate-type", .var "crate_type"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "--crate-name", .var "crate_name"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "--edition", SExpr.ctxAttr "edition"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-O"] [])
+  , .expr (.methodCall (.var "cmd") "add" [.str "-o", .methodCall (.var "out") "as_output" [] []] [])
+  , .blank
+  , .ifStmt [(SExpr.ctxAttr "proc_macro", [
+      .expr (.methodCall (.var "cmd") "add" [.str "--extern", .str "proc_macro"] [])
+    ])] []
+  , .forStmt "feature" (SExpr.ctxAttr "features") [
+      .expr (.methodCall (.var "cmd") "add"
+        [.str "--cfg", .format "feature=\"{}\"" [.var "feature"]] [])
+    ]
+  , .blank
+  , .assign "transitive_deps" (.list [])
+  , .forStmt "dep" (SExpr.ctxAttr "deps") [
+      .ifStmt [(.cmp "in" (.var "RustLibraryInfo") (.var "dep"), [
+        .assign "lib_info" (.index (.var "dep") (.var "RustLibraryInfo"))
+      , .expr (.methodCall (.var "cmd") "add"
+          [.call (.var "cmd_args") [.str "--extern",
+            .call (.var "cmd_args") [.dot (.var "lib_info") "crate_name", .str "=", .dot (.var "lib_info") "rlib"]
+              [("delimiter", .str "")]] []] [])
+      , .expr (.methodCall (.var "cmd") "add"
+          [.call (.var "cmd_args") [.dot (.var "lib_info") "rlib"]
+            [("format", .str "-Ldependency={}"), ("parent", .int 1)]] [])
+      , .expr (.methodCall (.var "transitive_deps") "append" [.dot (.var "lib_info") "rlib"] [])
+      , .forStmt "trans_rlib" (.dot (.var "lib_info") "transitive_deps") [
+          .expr (.methodCall (.var "cmd") "add"
+            [.call (.var "cmd_args") [.var "trans_rlib"]
+              [("format", .str "-Ldependency={}"), ("parent", .int 1)]] [])
+        , .expr (.methodCall (.var "transitive_deps") "append" [.var "trans_rlib"] [])
+        ]
+      ])] []
+    ]
+  , .blank
+  , .ifStmt [(SExpr.ctxAttr "srcs", [
+      .expr (.methodCall (.var "cmd") "add" [.index (SExpr.ctxAttr "srcs") (.int 0)] [])
+    , .ifStmt [(.cmp ">" (.call (.var "len") [SExpr.ctxAttr "srcs"] []) (.int 1), [
+        .expr (.methodCall (.var "cmd") "add"
+          [.call (.var "cmd_args") [] [("hidden", .raw "ctx.attrs.srcs[1:]")]] [])
+      ])] []
+    ])] []
+  , .blank
+  , .expr (SExpr.ctxAction "run" [.var "cmd"] [("category", .str "rustc")])
+  , .blank
+  , .ret (.list [
+      .call (.var "DefaultInfo") [] [("default_output", .var "out")],
+      .call (.var "RustLibraryInfo") [] [
+        ("rlib", .var "out"),
+        ("crate_name", .var "crate_name"),
+        ("transitive_deps", .var "transitive_deps")]
+    ]) ]
+
+def rustSFile : SFile :=
+  { header := "# toolchains/rust.bzl — generated by continuity\n#\n# Hermetic Rust toolchain + rules. Builder → AST → Render."
+  , items := [
+      .load "@prelude//rust:rust_toolchain.bzl" ["PanicRuntime", "RustToolchainInfo"]
+    , .blank
+    , .provider "RustCrateInfo"
+        [("rlib", "Artifact"), ("rmeta", "Artifact | None, default = None"), ("crate_name", "str")]
+    , .provider "RustLibraryInfo"
+        [("rlib", "Artifact"), ("crate_name", "str"), ("transitive_deps", "list, default = []")]
+    , .blank
+    -- rust_toolchain
+    , .funcDef "_rust_toolchain_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Rust toolchain with paths from .buckconfig.local.")
+        rustToolchainBody
+    , .ruleDef "rust_toolchain" "_rust_toolchain_impl" true
+        [ ("default_edition", .raw "attrs.string(default = \"2021\")")
+        , ("panic_runtime", .raw "attrs.string(default = \"unwind\")")
+        , ("rustc_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("rustc_binary_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("rustc_test_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("rustdoc_flags", .raw "attrs.list(attrs.string(), default = [])")
+        , ("allow_lints", .raw "attrs.list(attrs.string(), default = [])")
+        , ("deny_lints", .raw "attrs.list(attrs.string(), default = [])")
+        , ("warn_lints", .raw "attrs.list(attrs.string(), default = [])")
+        , ("report_unused_deps", .raw "attrs.bool(default = False)")
+        , ("doctests", .raw "attrs.bool(default = False)") ]
+    , .blank
+    -- rust_binary
+    , .funcDef "_rust_binary_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a Rust binary.")
+        rustBinaryBody
+    , .ruleDef "rust_binary" "_rust_binary_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source())")
+        , ("deps", .raw "attrs.list(attrs.dep(), default = [])")
+        , ("edition", .raw "attrs.string(default = \"2021\")") ]
+    , .blank
+    -- rust_library
+    , .funcDef "_rust_library_impl"
+        [⟨"ctx", some "AnalysisContext", none⟩]
+        (some "list[Provider]")
+        (some "Build a Rust library (rlib).")
+        rustLibraryBody
+    , .ruleDef "rust_library" "_rust_library_impl" false
+        [ ("srcs", .raw "attrs.list(attrs.source())")
+        , ("deps", .raw "attrs.list(attrs.dep(), default = [])")
+        , ("edition", .raw "attrs.string(default = \"2021\")")
+        , ("crate_name", .raw "attrs.option(attrs.string(), default = None)")
+        , ("proc_macro", .raw "attrs.bool(default = False)")
+        , ("features", .raw "attrs.list(attrs.string(), default = [])") ]
+    ] }
+
+#eval (renderSFile rustSFile).length
+
 /- ════════════════════════════════════════════════════════════════════════════════
                                                        // all .bzl files
    ════════════════════════════════════════════════════════════════════════════════ -/
@@ -444,6 +642,7 @@ def leanSFile : SFile :=
 def bzlFiles : List (String × String) :=
   [ ("toolchains/cxx.bzl", renderBzlFile cxxBzl)
   , ("toolchains/lean.bzl", renderSFile leanSFile)
+  , ("toolchains/rust.bzl", renderSFile rustSFile)
   ]
 
 end Continuity.Codegen.Build.BzlDefs
