@@ -50,6 +50,8 @@
           lean = true;
           cxx = true;
           haskell = true;
+          rust = true;
+          purescript = true;
         };
 
         packages = {
