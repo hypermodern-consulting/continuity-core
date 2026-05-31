@@ -58,6 +58,7 @@ lean_library(
         "Continuity/Build/Genrule.lean",
         "Continuity/Build/Rule.lean",
         "Continuity/Build/BzlFile.lean",
+        "Continuity/Build/Library.lean",
         "Continuity/Derivation.lean",
         "Continuity/REAPI.lean",
         "Continuity/InitBuck2.lean",

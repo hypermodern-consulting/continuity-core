@@ -48,6 +48,7 @@ import Continuity.Build.Nv
 import Continuity.Build.Genrule
 import Continuity.Build.Rule
 import Continuity.Build.BzlFile
+import Continuity.Build.Library
 import Continuity.Codegen.Build.ToDhall
 import Continuity.Codegen.Build.ToStarlark
 import Continuity.Codegen.Build.BzlDefs

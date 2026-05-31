@@ -4,6 +4,7 @@ import Continuity.Build.Vis
 import Continuity.Build.Resource
 import Continuity.Build.Toolchain
 import Continuity.Build.Cxx
+import Continuity.Build.Library
 import Continuity.Build.BzlFile
 import Continuity.Emit.Dhall.Ast
 import Continuity.Emit.Dhall.Render
@@ -1110,6 +1111,67 @@ def emitPreludeDhall : Expr :=
 
 
 /- ════════════════════════════════════════════════════════════════════════════════
+                                                   // Library.dhall module
+   ════════════════════════════════════════════════════════════════════════════════ -/
+
+def emitLibraryDhall : Expr :=
+  -- LibDep: what a project declares it needs (unresolved)
+  let libDep := ("LibDep", Option.none, buildRecordType do
+    field "name"     (Expr.ty "Text")
+    field "flake"    (Expr.ty "Text")
+    field "flakeDev" (Expr.optionalOf (Expr.ty "Text"))
+    field "libs"     textListTy
+    field "pc"       (Expr.optionalOf (Expr.ty "Text")))
+  let libDepFn := ("libDep", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "flake" (Expr.ty "Text")
+        (buildRecord do
+          field "name"     (Expr.var "name")
+          field "flake"    (Expr.var "flake")
+          field "flakeDev" (Expr.none (Expr.ty "Text"))
+          field "libs"     emptyTextList
+          field "pc"       (Expr.none (Expr.ty "Text")))))
+
+  -- ResolvedLib: after Nix resolves store paths
+  let resolvedLib := ("ResolvedLib", Option.none, buildRecordType do
+    field "name"       (Expr.ty "Text")
+    field "includeDir" (Expr.ty "Text")
+    field "libDir"     (Expr.ty "Text")
+    field "libs"       textListTy)
+  let resolvedLibFn := ("resolvedLib", Option.none,
+    Expr.lambda "name" (Expr.ty "Text")
+      (Expr.lambda "includeDir" (Expr.ty "Text")
+        (Expr.lambda "libDir" (Expr.ty "Text")
+          (Expr.lambda "libs" textListTy
+            (buildRecord do
+              field "name"       (Expr.var "name")
+              field "includeDir" (Expr.var "includeDir")
+              field "libDir"     (Expr.var "libDir")
+              field "libs"       (Expr.var "libs"))))))
+
+  -- LibSpec: a project's full library specification
+  let libSpec := ("LibSpec", Option.none, buildRecordType do
+    field "cxx"     (Expr.listOf (Expr.var "ResolvedLib"))
+    field "haskell" textListTy)
+  let libSpecFn := ("libSpec", Option.none,
+    buildRecord do
+      field "cxx"     (Expr.emptyList (Expr.var "ResolvedLib"))
+      field "haskell" emptyTextList)
+
+  let exports := buildRecord do
+    field "LibDep"      (Expr.var "LibDep")
+    field "libDep"      (Expr.var "libDep")
+    field "ResolvedLib" (Expr.var "ResolvedLib")
+    field "resolvedLib" (Expr.var "resolvedLib")
+    field "LibSpec"     (Expr.var "LibSpec")
+    field "emptySpec"   (Expr.var "libSpec")
+
+  Expr.letChain
+    [libDep, libDepFn, resolvedLib, resolvedLibFn, libSpec, libSpecFn]
+    exports
+
+
+/- ════════════════════════════════════════════════════════════════════════════════
                                                // final prelude file list
    ════════════════════════════════════════════════════════════════════════════════ -/
 
@@ -1118,6 +1180,7 @@ def preludeFiles : List (String × Expr) :=
   , ("core/Dep.dhall",               emitDepDhall)
   , ("core/Vis.dhall",               emitVisDhall)
   , ("core/Resource.dhall",          emitResourceDhall)
+  , ("core/Library.dhall",           emitLibraryDhall)
   , ("build/Toolchain.dhall",        emitToolchainDhall)
   , ("lang/Cxx.dhall",               emitCxxDhall)
   , ("lang/Haskell.dhall",           emitHaskellDhall)
