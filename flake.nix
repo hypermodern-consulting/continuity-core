@@ -54,7 +54,7 @@
 
         packages = {
           default = config.continuity.binary;
-          inherit (config.continuity) binary generated lean4;
+          inherit (config.continuity) binary generated lean4 buckconfig;
           tools-dhall = config.continuity.tools;
         };
 

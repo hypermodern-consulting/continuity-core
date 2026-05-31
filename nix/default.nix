@@ -14,25 +14,24 @@
 #             cxx = true;
 #             haskell = true;
 #           };
-#           # config.continuity.binary    — continuity executable
-#           # config.continuity.generated — all generated sources
-#           # config.continuity.lean4     — Lean 4.30.0 derivation
-#           # config.continuity.tools     — resolved tools.dhall
+#           # config.continuity.binary     — continuity executable
+#           # config.continuity.generated  — all generated sources
+#           # config.continuity.buckconfig — .buckconfig.local with store paths
+#           # config.continuity.devShell   — nix develop with everything on PATH
 #         };
 #       };
 #   }
 
-# First argument: closed over by the flake that defines this module.
-# Consumers never see these — they're baked in at module definition time.
+# Closed over by the defining flake. Consumers never see these.
 { lean4-src, mimalloc-src, leantar-src, continuity-src }:
 
-# Second argument: standard flake-parts module API.
+# Standard flake-parts module API.
 { flake-parts-lib, ... }:
 {
   options.perSystem = flake-parts-lib.mkPerSystemOption (
     { config, pkgs, lib, ... }:
     let
-      inherit (lib) mkOption mkEnableOption types mkIf mkDefault;
+      inherit (lib) mkOption mkEnableOption types;
       cfg = config.continuity;
 
       lean4 = import ./lean4.nix {
@@ -53,7 +52,6 @@
         src = continuity-src;
       };
 
-      # Generate tools.dhall from toolchains config
       resolvedTools = import ./tools.nix { inherit pkgs lean4; } {
         lean    = cfg.toolchains.lean;
         cxx     = cfg.toolchains.cxx;
@@ -62,14 +60,22 @@
         nv      = cfg.toolchains.cuda;
       };
 
-      # Toolchain packages for devShell, conditional on what's enabled
+      buckconfig = import ./buckconfig.nix {
+        inherit pkgs lib lean4;
+        toolchains = cfg.toolchains;
+      };
+
       toolchainPackages = lib.concatLists [
-        (lib.optional cfg.toolchains.lean    lean4)
-        (lib.optional cfg.toolchains.cxx     pkgs.gcc)
-        (lib.optional cfg.toolchains.haskell pkgs.ghc)
-        (lib.optional cfg.toolchains.haskell pkgs.cabal-install)
-        (lib.optional cfg.toolchains.rust    pkgs.rustc)
-        (lib.optional cfg.toolchains.rust    pkgs.cargo)
+        (lib.optional cfg.toolchains.lean       lean4)
+        (lib.optional cfg.toolchains.cxx        pkgs.gcc)
+        (lib.optional cfg.toolchains.haskell    pkgs.ghc)
+        (lib.optional cfg.toolchains.haskell    pkgs.cabal-install)
+        (lib.optional cfg.toolchains.rust       pkgs.rustc)
+        (lib.optional cfg.toolchains.rust       pkgs.cargo)
+        (lib.optional cfg.toolchains.python     pkgs.python3)
+        (lib.optional cfg.toolchains.purescript pkgs.purescript)
+        (lib.optional cfg.toolchains.purescript pkgs.spago)
+        (lib.optional cfg.toolchains.purescript pkgs.nodejs)
         (lib.optionals cfg.toolchains.cuda [
           pkgs.cudaPackages.cuda_nvcc
           pkgs.cudaPackages.cuda_cudart
@@ -79,11 +85,13 @@
     {
       options.continuity = {
         toolchains = {
-          lean    = mkEnableOption "Lean 4 toolchain";
-          cxx     = mkEnableOption "C/C++ toolchain";
-          haskell = mkEnableOption "Haskell toolchain (GHC + Cabal)";
-          rust    = mkEnableOption "Rust toolchain";
-          cuda    = mkEnableOption "NVIDIA CUDA toolchain";
+          lean       = mkEnableOption "Lean 4 toolchain";
+          cxx        = mkEnableOption "C/C++ toolchain";
+          haskell    = mkEnableOption "Haskell toolchain (GHC + Cabal)";
+          rust       = mkEnableOption "Rust toolchain";
+          cuda       = mkEnableOption "NVIDIA CUDA toolchain";
+          python     = mkEnableOption "Python toolchain";
+          purescript = mkEnableOption "PureScript toolchain";
           reapi = mkOption {
             type = types.nullOr (types.submodule {
               options = {
@@ -103,13 +111,19 @@
           type = types.package;
           default = resolvedTools;
           description = ''
-            Path to tools.dhall. Defaults to a Nix-generated file with
-            store paths derived from enabled toolchains. Override for
-            custom toolchain layouts.
+            tools.dhall with Nix store paths. Override for custom layouts.
           '';
         };
 
-        # Read-only outputs
+        buckconfig = mkOption {
+          type = types.package;
+          default = buckconfig;
+          description = ''
+            .buckconfig.local with Nix store paths for all enabled toolchains.
+            Symlink into your project: ln -sf $(nix build .#buckconfig --print-out-paths) .buckconfig.local
+          '';
+        };
+
         lean4 = mkOption {
           type = types.package;
           readOnly = true;
@@ -147,6 +161,11 @@
               pkgs.git
               pkgs.gnumake
             ];
+            shellHook = ''
+              if [ -f lakefile.lean ] || [ -f BUCK ]; then
+                ln -sf ${buckconfig} .buckconfig.local
+              fi
+            '';
           };
           description = "Development shell with all enabled toolchains.";
         };
