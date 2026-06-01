@@ -78,6 +78,23 @@ def parseFrameHeader (bs : Bytes) : ParseResult FrameHeader :=
       .ok ⟨len, ft, flags, sid.toUInt32⟩ (bs.extract 9 bs.size)
   else .fail
 
+def serializeFrameHeader (h : FrameHeader) : Bytes :=
+  let len0 := (h.length / 65536 % 256).toUInt8
+  let len1 := (h.length / 256 % 256).toUInt8
+  let len2 := (h.length % 256).toUInt8
+  let typeByte := h.frameType.toUInt8
+  let sid := h.streamId.toNat
+  let sid0 := ((sid / 16777216) % 128).toUInt8
+  let sid1 := ((sid / 65536) % 256).toUInt8
+  let sid2 := ((sid / 256) % 256).toUInt8
+  let sid3 := (sid % 256).toUInt8
+  ⟨#[len0, len1, len2, typeByte, h.flags, sid0, sid1, sid2, sid3]⟩
+
+theorem frameHeader_roundtrip (h : FrameHeader) :
+    parseFrameHeader (serializeFrameHeader h) = ParseResult.ok h ByteArray.empty := by
+  -- TODO[b7r6]: !! proof needed !!
+  sorry
+
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ---                                                              // core // hpack
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

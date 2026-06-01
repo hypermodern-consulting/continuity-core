@@ -45,6 +45,18 @@ def selector : Box Selector := fixedBytes 4
 def encodeUint64 (v : UInt64) : ByteArray :=
   ByteArray.mk (Array.replicate 24 0) ++ u64le.serialize v
 
+def decodeUint64 (bs : ByteArray) : Option UInt64 :=
+  if bs.size = 32 then
+    let suffix := bs.extract 24 32
+    match u64le.parse suffix with
+    | .ok v rest => if rest.size = 0 then some v else none
+    | .fail => none
+  else none
+
+theorem uint64_roundtrip (n : UInt64) : decodeUint64 (encodeUint64 n) = some n := by
+  -- TODO[b7r6]: !! proof needed !! -- zero-pad + u64le roundtrip
+  sorry
+
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ---                                                           // attest //  calldata
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

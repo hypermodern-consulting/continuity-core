@@ -446,9 +446,21 @@ def isoBox {α β : Type} (box : Box α) (f : α → β) (g : β → α)
 ---                                                             // multi-byte boxes
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
--- u32le and u64le use `BitVec` for clean proofs via `bv_decide`.
--- the key insight: `extractByte` and `combineBytes` are inverses,
--- and `bv_decide` can verify this automatically for fixed widths.
+-- Proof strategy (borrowed from straylight/0x01-continuity/Codec/Proofs.lean):
+-- Bitvector LE/BE encoding/decoding proofs use `bv_decide` from
+-- `Std.Tactic.BVDecide`. The pattern:
+--   1. Define extractByte/combineBytes lemmas as `theorem ... := by bv_decide`
+--   2. Use `isoBox` with bv_decide proofs for float/uint conversions
+--   3. Prove roundtrip via `isoBox_roundtrip` composition
+-- This avoids hundreds of manual `omega`/`arith` proof lines.
+--
+-- Concretely:
+--   `extractBytes64_combineBytes` / `extractBytes32_combineBytes` are the
+--   central bv_decide lemmas: extracting all bytes from a BitVec then
+--   recombining produces the original value. Per-index simp lemmas
+--   (`sU64_bv0`..`sU64_bv7`, `sU32_bv0`..`sU32_bv3`) bridge from ByteArray
+--   indexing to the BitVec extraction, enabling `simp` to discharge the
+--   roundtrip/consumption goals in a few lines.
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ---                                                             // derived // boxes

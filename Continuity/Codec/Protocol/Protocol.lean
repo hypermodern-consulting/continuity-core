@@ -115,4 +115,61 @@ def zmtpEncodeLength (n : Nat) : Bytes :=
   if n < 255 then ⟨#[n.toUInt8]⟩
   else ⟨#[0xFF]⟩ ++ u64le.serialize n.toUInt64
 
+def zmtpDecodeLength (bs : Bytes) : Option (Nat × Nat) :=
+  if h : bs.size > 0 then
+    let b := bs.data[0]!
+    if b == 0xFF then
+      if bs.size >= 9 then
+        match u64le.parse (bs.extract 1 bs.size) with
+        | .ok len _ => some (len.toNat, 9)
+        | .fail => none
+      else none
+    else some (b.toNat, 1)
+  else none
+
+def gitLengthCodec : LengthCodec where
+  fixedSize := 4
+  maxPayload := 65531
+  encode := gitEncodeLength
+  decode := gitDecodeLength
+  roundtrip := by
+    intro n h
+    sorry
+  encode_size := by
+    intro n
+    sorry
+  decode_append := by
+    intro n extra h
+    sorry
+
+def nixLengthCodec : LengthCodec where
+  fixedSize := 8
+  maxPayload := 18446744073709551615
+  encode := nixEncodeLength
+  decode := nixDecodeLength
+  roundtrip := by
+    intro n h
+    sorry
+  encode_size := by
+    intro n
+    sorry
+  decode_append := by
+    intro n extra h
+    sorry
+
+def zmtpLengthCodec : LengthCodec where
+  fixedSize := 9
+  maxPayload := 18446744073709551615
+  encode := zmtpEncodeLength
+  decode := zmtpDecodeLength
+  roundtrip := by
+    intro n h
+    sorry
+  encode_size := by
+    intro n
+    sorry
+  decode_append := by
+    intro n extra h
+    sorry
+
 end Continuity.Codec.Protocol.Protocol
