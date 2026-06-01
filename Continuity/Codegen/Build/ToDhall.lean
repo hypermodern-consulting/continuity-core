@@ -1222,6 +1222,133 @@ def emitLibraryDhall : Expr :=
     exports
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                               // module // `Coeffect.dhall`
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/-
+  `Coeffect.dhall` — coeffect types matching `Continuity.Straylight.Coeffect.Coeffect`.
+
+  The Lean inductive has 7 constructors. This Dhall module defines the
+  corresponding union type, render helpers, grade derivation, and the
+  `DischargeProof` record for attestation verification.
+-/
+
+def emitCoeffectDhall : Expr :=
+  let coeffectType := ("Coeffect", Option.some (Expr.ty "Type"),
+    Expr.unionType [
+      ("Pure",      Option.none),
+      ("Network",   Option.some (buildRecordType do
+        field "host" (Expr.ty "Text")
+        field "bytes_sent" (Expr.ty "Natural")
+        field "bytes_recv" (Expr.ty "Natural")
+        field "response_hash" (Expr.ty "Text"))),
+      ("Filesystem", Option.some (buildRecordType do
+        field "path" (Expr.ty "Text")
+        field "reads" (Expr.ty "Natural")
+        field "writes" (Expr.ty "Natural"))),
+      ("Auth", Option.some (buildRecordType do
+        field "provider" (Expr.ty "Text")
+        field "credential_hash" (Expr.ty "Text"))),
+      ("Sandbox", Option.some (buildRecordType do
+        field "device" (Expr.ty "Text")
+        field "kernel_version" (Expr.ty "Text"))),
+      ("Time", Option.some (buildRecordType do
+        field "timestamp" (Expr.ty "Natural"))),
+      ("Random", Option.some (buildRecordType do
+        field "seed_hash" (Expr.ty "Text")))
+    ])
+
+  let gradeLabelType := ("GradeLabel", Option.some (Expr.ty "Type"),
+    emitEnum ["Net", "Auth", "Fs", "Sandbox", "Time", "Random"])
+
+  let gradeType := ("Grade", Option.some (Expr.ty "Type"),
+    Expr.listOf (Expr.var "GradeLabel"))
+
+  let gradePure := ("gradePure", Option.none,
+    Expr.emptyList (Expr.var "GradeLabel"))
+
+  let renderCoeffect := ("renderCoeffect", Option.none,
+    Expr.lambda "c" (Expr.var "Coeffect")
+      (Expr.merge
+        (buildRecord do
+          field "Pure" (Expr.str "pure")
+          field "Network" (Expr.str "network")
+          field "Filesystem" (Expr.str "filesystem")
+          field "Auth" (Expr.str "auth")
+          field "Sandbox" (Expr.str "sandbox")
+          field "Time" (Expr.str "time")
+          field "Random" (Expr.str "random"))
+        (Expr.var "c")
+        Option.none))
+
+  let dischargeProofType := ("DischargeProof", Option.none, buildRecordType do
+    field "coeffects" (Expr.listOf (Expr.var "Coeffect"))
+    field "declared_grade" (Expr.var "Grade")
+    field "derivation_hash" (Expr.ty "Text")
+    field "output_hashes" (Expr.listOf (Expr.ty "Text"))
+    field "builder_signature" (Expr.optionalOf (Expr.ty "Text")))
+
+  let exports := buildRecord do
+    field "Coeffect"       (Expr.var "Coeffect")
+    field "GradeLabel"     (Expr.var "GradeLabel")
+    field "Grade"          (Expr.var "Grade")
+    field "gradePure"      (Expr.var "gradePure")
+    field "renderCoeffect" (Expr.var "renderCoeffect")
+    field "DischargeProof" (Expr.var "DischargeProof")
+
+  Expr.letChain
+    [coeffectType, gradeLabelType, gradeType, gradePure, renderCoeffect, dischargeProofType]
+    exports
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                           // module // `Attestation.dhall`
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/-
+  `Attestation.dhall` — attestation template describing build coeffect
+  requirements, discharge evidence, proof receipts, and signatures.
+
+  This is the top-level attestation record linking the build's declared
+  grade to its actual discharge evidence and the reflective hash
+  (MANIFEST.sha256) that proves output reproducibility.
+
+  The file is a template: concrete `oleans_hash`, `discharged` values,
+  `proofs`, `identity` and `signature` are filled in by the build system
+  after lake build completes.
+-/
+
+def emitAttestationDhall : Expr :=
+  let bld := ("Build", Option.none, Expr.importFile "package.dhall")
+  let ce  := ("Coeffect", Option.none, Expr.importFile "core/Coeffect.dhall")
+
+  let exports := buildRecord do
+    field "module" (Expr.str "continuity")
+    field "olean_hash" (Expr.str "sha256:<filled-by-build>")
+    field "declared_grade" (buildRecord do
+      field "network" Expr.tt
+      field "auth" Expr.tt
+      field "crypto" Expr.tt)
+    field "discharged" (buildRecord do
+      field "network" (Expr.listLit [
+        buildRecord do
+          field "host" (Expr.str "<host>")
+          field "bytes_sent" (Expr.nat 0)
+          field "bytes_recv" (Expr.nat 0)
+          field "response_hash" (Expr.str "sha256:<response-hash>")])
+      field "auth" (Expr.listLit [
+        buildRecord do
+          field "provider" (Expr.str "huggingface")
+          field "credential_hash" (Expr.str "sha256:<credential-hash>")]))
+    field "proofs" (buildRecord do
+      field "coeffect_algebra" (buildRecord do
+        field "theorems" (Expr.listLit [Expr.str "left_identity", Expr.str "associativity", Expr.str "idempotence"])
+        field "olean_hash" (Expr.str "sha256:<proof-olean-hash>")))
+    field "identity" (Expr.str "ed25519:<signing-key-hash>")
+    field "signature" (Expr.str "sig:<signature>")
+
+  Expr.letChain [bld, ce] exports
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ---                                                           // prelude // files
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1231,6 +1358,8 @@ def preludeFiles : List (String × Expr) :=
   , ("core/Vis.dhall",               emitVisDhall)
   , ("core/Resource.dhall",          emitResourceDhall)
   , ("core/Library.dhall",           emitLibraryDhall)
+  , ("core/Coeffect.dhall",          emitCoeffectDhall)
+  , ("attestation.dhall",            emitAttestationDhall)
   , ("build/Toolchain.dhall",        emitToolchainDhall)
   , ("lang/Cxx.dhall",               emitCxxDhall)
   , ("lang/Haskell.dhall",           emitHaskellDhall)

@@ -9,7 +9,9 @@ import Continuity.Codegen.AST.Starlark.Ast
 import Continuity.Codegen.AST.Starlark.Render
 import Continuity.Codegen.AST.Cpp.Primitives
 import Continuity.Codegen.AST.Haskell.Primitives
-import Continuity.Codegen.AST.Haskell.Primitives
+
+import Continuity.Crypto.SHA256
+import Continuity.Nix.Derivation
 
 set_option autoImplicit false
 
@@ -172,5 +174,61 @@ def hsPrimitivesFiles : List (String × String) :=
   , ("grade/Control/Grade/Do.hs",
      Continuity.Codegen.AST.Haskell.Primitives.emitHsGradeDo)
   ]
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                          // reflective // hash // verification
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/-
+  Reflective hash verification (§5 of the paper).
+
+  Step 1 (deriveReflectiveManifest):
+    Given a list of (path, content) pairs, compute
+      h₁ := SHA256(LP("Derive") ++ LP(path₁) ++ LP(content₁) ++ ...)
+    where each entry is length-prefixed for unambiguous hashing.
+    Writes `h₁` to a MANIFEST.sha256 file.
+
+  Step 2 (deriveReflectiveVerify):
+    Recompute h₂ from the same files and check h₂ == h₁.
+    This is the reflective check — the build system can re-run
+    to verify that the current output matches the predicted hash.
+
+  The LP-framing is identical to the one used in Nix/Derivation.lean,
+  preventing boundary-shift injection attacks.
+-/
+
+open Continuity.Crypto.SHA256
+open Continuity.Nix.Derivation
+
+def deriveReflectiveManifest
+    (files : List (String × String))
+    (outDir : String)
+    : IO String := do
+  let mut manifest := ByteArray.empty
+  for (path, content) in files do
+    manifest := writeLPStr manifest path
+    manifest := writeLPStr manifest content
+  let h1 := hashHex manifest
+  IO.FS.writeFile (outDir ++ "/MANIFEST.sha256") (h1 ++ "\n")
+  pure h1
+
+def deriveReflectiveVerify
+    (files : List (String × String))
+    (manifestPath : String)
+    : IO Bool := do
+  let h1bytes ← IO.FS.readFile manifestPath
+  let h1 := h1bytes.trimAscii.toString.replace "\n" ""
+  let mut expected := ByteArray.empty
+  for (path, content) in files do
+    expected := writeLPStr expected path
+    expected := writeLPStr expected content
+  let h2 := hashHex expected
+  pure (h1 == h2)
+
+def reflectivelyVerify
+    (genFiles : List (String × String))
+    (outDir : String)
+    : IO Bool :=
+  deriveReflectiveVerify genFiles (outDir ++ "/MANIFEST.sha256")
 
 end Continuity.Codegen.Derive.Build

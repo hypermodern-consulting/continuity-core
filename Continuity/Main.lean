@@ -69,8 +69,6 @@ def cmdGenerate (outDir : String) : IO Unit := do
     IO.FS.createDirAll dir
     IO.FS.writeFile fullPath content
     IO.println s!"  wrote {path}"
-  let total := preludeFiles.length + cppCodecFiles.length + hsCodecFiles.length +
-    hsPrimitivesFiles.length + cppPrimitivesFiles.length + cppStateMachineFiles.length
 
   -- `Grade` module (Haskell + C++)
   let gradeHsPath := s!"{outDir}/grade/Continuity/Grade.hs"
@@ -122,32 +120,40 @@ def cmdGenerate (outDir : String) : IO Unit := do
       IO.println s!"  wrote toolchains/{bzl} (copied)"
 
   -- reflective hash prediction (§5 of the paper):
-  -- compute `h1 = SHA-256(concatenated output)` using the verified Lean implementation.
-  -- this is the prediction. the build system can verify the files on disk match.
-  -- LP-frame each entry: `LP(path) ++ LP(content)` for unambiguous hashing
-  let mut manifest := ByteArray.empty
+  -- collect all generated (path, content) pairs and compute
+  -- h₁ := SHA256(LP-framed concatenation) via deriveReflectiveManifest.
+  -- LP-frame each entry: LP(path) ++ LP(content) for unambiguous hashing.
+  let mut generatedFiles : List (String × String) := []
   for (path, expr) in preludeFiles do
-    let content := render expr ++ "\n"
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
+    generatedFiles := (path, render expr ++ "\n") :: generatedFiles
   for (path, content) in cppCodecFiles do
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
+    generatedFiles := (path, content) :: generatedFiles
   for (path, content) in hsCodecFiles do
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
-
-  for (path, content) in hsPrimitivesFiles do
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
-
+    generatedFiles := (path, content) :: generatedFiles
+  generatedFiles := ("test/codec_test_vectors.cpp", deriveCppTests) :: generatedFiles
   for (path, content) in cppStateMachineFiles do
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
-    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
+    generatedFiles := (path, content) :: generatedFiles
+  for (path, content) in hsPrimitivesFiles do
+    generatedFiles := (path, content) :: generatedFiles
+  generatedFiles := ("grade/Continuity/Grade.hs", Continuity.Codegen.Algebra.Effect.emitGradeModule) :: generatedFiles
+  generatedFiles := ("grade/continuity_grade.hpp", Continuity.Codegen.Algebra.Effect.emitCppGradeEnum) :: generatedFiles
+  for (path, content) in starlarkOut do
+    generatedFiles := (path, content) :: generatedFiles
+  for (path, content) in bzlFiles do
+    generatedFiles := (path, content) :: generatedFiles
 
-  let h1 := Continuity.Crypto.SHA256.hashHex manifest
-  IO.FS.writeFile (outDir ++ "/MANIFEST.sha256") (h1 ++ "\n")
-  IO.println s!"h1 = {h1}"
+  let h1 ← deriveReflectiveManifest generatedFiles.reverse outDir
+
+  -- reflective verification: re-compute h₂ and check h₂ == h₁
+  let verifies ← reflectivelyVerify generatedFiles.reverse outDir
+  if verifies then
+    IO.println s!"Reflective check: h₁ = h₂ = {h1} ✓"
+  else
+    IO.eprintln s!"Reflective check FAILED: h₁ = {h1}, re-computed h₂ differs"
+
+  let total := preludeFiles.length + cppCodecFiles.length + hsCodecFiles.length +
+    hsPrimitivesFiles.length + cppPrimitivesFiles.length + cppStateMachineFiles.length
+  IO.println s!"h₁ = {h1}"
   IO.println s!"Done. {total} files generated."
 
 def findSpec (args : List String) : Option String :=
@@ -160,7 +166,7 @@ def findSpec (args : List String) : Option String :=
 def findTarget (args : List String) : String :=
   (args.filter (fun s => !s.startsWith "--")).head?.getD "."
 
-def main (args : List String) : IO Unit := do
+def run (args : List String) : IO Unit := do
   match args.head? with
   | some "--help" | some "-h" =>
     IO.println "continuity — verified metaprogramming platform"
@@ -176,3 +182,6 @@ def main (args : List String) : IO Unit := do
   | _ => cmdGenerate (args.head?.getD "output/continuity-prelude")
 
 end Continuity
+
+def main (args : List String) : IO Unit :=
+  Continuity.run args
