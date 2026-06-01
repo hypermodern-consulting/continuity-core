@@ -3,6 +3,9 @@ import Continuity.Build.Rule.Haskell
 import Continuity.Build.Rule.Rust
 import Continuity.Build.Rule.Lean4
 import Continuity.Build.Rule.Nv
+import Continuity.Build.Rule.PureScript
+import Continuity.Build.Rule.NixCxx
+import Continuity.Build.Rule.RustCrate
 import Continuity.Build.Core.Genrule
 
 set_option autoImplicit false
@@ -22,6 +25,8 @@ set_option autoImplicit false
 
 namespace Continuity.Build
 
+open Rule
+
 /-
   The Build Rule Union.
 
@@ -30,7 +35,8 @@ namespace Continuity.Build
   to be heterogeneous — a `Cxx` binary can depend on a `Rust` library
   which depends on a `genrule` which shells out to `Nv`.
 
-  Language modules: `Cxx`, `Rs`, `Hs`, `Ln`, `Nv`, `Genrule`.
+  Language modules: `Cxx`, `Rs`, `Hs`, `Ln`, `Nv`, `Genrule`,
+  `PureScript`, `NixCxx`, `RustCrate`.
 -/
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -38,18 +44,24 @@ namespace Continuity.Build
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 inductive Rule where
-  | cxxBinary         : Cxx.Binary     → Rule
-  | cxxLibrary        : Cxx.Library    → Rule
-  | rustBinary        : Rs.Binary      → Rule
-  | rustLibrary       : Rs.Library     → Rule
-  | haskellBinary     : Hs.Binary      → Rule
-  | haskellLibrary    : Hs.Library     → Rule
-  | haskellFFIBinary  : Hs.FFIBinary   → Rule
-  | leanBinary        : Ln.Binary      → Rule
-  | leanLibrary       : Ln.Library     → Rule
-  | nvBinary          : Nv.Binary      → Rule
-  | nvLibrary         : Nv.Library     → Rule
-  | genrule           : Genrule        → Rule
+  | cxxBinary         : Cxx.Binary         → Rule
+  | cxxLibrary        : Cxx.Library        → Rule
+  | rustBinary        : Rs.Binary          → Rule
+  | rustLibrary       : Rs.Library         → Rule
+  | haskellBinary     : Hs.Binary          → Rule
+  | haskellLibrary    : Hs.Library         → Rule
+  | haskellFFIBinary  : Hs.FFIBinary       → Rule
+  | leanBinary        : Ln.Binary          → Rule
+  | leanLibrary       : Ln.Library         → Rule
+  | nvBinary          : Nv.Binary          → Rule
+  | nvLibrary         : Nv.Library         → Rule
+  | pureScriptApp     : PureScript.PureScriptApp    → Rule
+  | pureScriptBinary  : PureScript.PureScriptBinary  → Rule
+  | pureScriptLibrary : PureScript.PureScriptLibrary → Rule
+  | nixCxxBinary      : NixCxx.NixCxxBinary → Rule
+  | cratesIo          : RustCrate.CratesIo  → Rule
+  | httpArchive       : RustCrate.HttpArchive → Rule
+  | genrule           : Genrule             → Rule
   deriving Repr, Inhabited
 
 end Continuity.Build

@@ -49,6 +49,9 @@ import Continuity.Build.Rule.Haskell
 import Continuity.Build.Rule.Rust
 import Continuity.Build.Rule.Lean4
 import Continuity.Build.Rule.Nv
+import Continuity.Build.Rule.PureScript
+import Continuity.Build.Rule.NixCxx
+import Continuity.Build.Rule.RustCrate
 import Continuity.Build.Core.Genrule
 import Continuity.Build.Core.Rule
 import Continuity.Build.Core.Library
