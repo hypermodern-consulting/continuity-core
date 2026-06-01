@@ -1520,6 +1520,10 @@ private def psAppBody : List SStmt :=
       .expr (.methodCall (.var "script_parts") "append"
         [.call (.var "cmd_args") [.str "cp ", SExpr.ctxAttr "spago_dhall", .str " $WORK_DIR/spago.dhall"] [("delimiter", .str "")]] [])
     ])] []
+  , .ifStmt [(SExpr.ctxAttr "packages_dhall", [
+      .expr (.methodCall (.var "script_parts") "append"
+        [.call (.var "cmd_args") [.str "cp ", SExpr.ctxAttr "packages_dhall", .str " $WORK_DIR/packages.dhall"] [("delimiter", .str "")]] [])
+    ])] []
   , .blank
   , .comment "Copy sources preserving structure"
   , .forStmt "src" (SExpr.ctxAttr "srcs") [
@@ -1555,6 +1559,7 @@ private def psAppBody : List SStmt :=
   , .assign "hidden" (.call (.var "list") [SExpr.ctxAttr "srcs"] [])
   , .ifStmt [(SExpr.ctxAttr "spago_yaml", [.expr (.methodCall (.var "hidden") "append" [SExpr.ctxAttr "spago_yaml"] [])])] []
   , .ifStmt [(SExpr.ctxAttr "spago_dhall", [.expr (.methodCall (.var "hidden") "append" [SExpr.ctxAttr "spago_dhall"] [])])] []
+  , .ifStmt [(SExpr.ctxAttr "packages_dhall", [.expr (.methodCall (.var "hidden") "append" [SExpr.ctxAttr "packages_dhall"] [])])] []
   , .ifStmt [(SExpr.ctxAttr "index_html", [.expr (.methodCall (.var "hidden") "append" [SExpr.ctxAttr "index_html"] [])])] []
   , .ifStmt [(SExpr.ctxAttr "style_css", [.expr (.methodCall (.var "hidden") "append" [SExpr.ctxAttr "style_css"] [])])] []
   , .blank
@@ -1606,6 +1611,7 @@ def purescriptSFile : SFile :=
         [ ("srcs", .raw "attrs.list(attrs.source(), default = [])")
         , ("spago_yaml", .raw "attrs.option(attrs.source(), default = None)")
         , ("spago_dhall", .raw "attrs.option(attrs.source(), default = None)")
+        , ("packages_dhall", .raw "attrs.option(attrs.source(), default = None)")
         , ("main", .raw "attrs.string(default = \"Main\")")
         , ("index_html", .raw "attrs.option(attrs.source(), default = None)")
         , ("style_css", .raw "attrs.option(attrs.source(), default = None)") ]

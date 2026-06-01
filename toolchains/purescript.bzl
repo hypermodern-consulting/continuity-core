@@ -75,6 +75,8 @@ def _purescript_app_impl(ctx: AnalysisContext) -> list[Provider]:
         script_parts.append(cmd_args("cp ", ctx.attrs.spago_yaml, " $WORK_DIR/spago.yaml", delimiter = ""))
     if ctx.attrs.spago_dhall:
         script_parts.append(cmd_args("cp ", ctx.attrs.spago_dhall, " $WORK_DIR/spago.dhall", delimiter = ""))
+    if ctx.attrs.packages_dhall:
+        script_parts.append(cmd_args("cp ", ctx.attrs.packages_dhall, " $WORK_DIR/packages.dhall", delimiter = ""))
 
     # Copy sources preserving structure
     for src in ctx.attrs.srcs:
@@ -102,6 +104,8 @@ def _purescript_app_impl(ctx: AnalysisContext) -> list[Provider]:
         hidden.append(ctx.attrs.spago_yaml)
     if ctx.attrs.spago_dhall:
         hidden.append(ctx.attrs.spago_dhall)
+    if ctx.attrs.packages_dhall:
+        hidden.append(ctx.attrs.packages_dhall)
     if ctx.attrs.index_html:
         hidden.append(ctx.attrs.index_html)
     if ctx.attrs.style_css:
@@ -117,6 +121,7 @@ purescript_app = rule(
         "srcs": attrs.list(attrs.source(), default = []),
         "spago_yaml": attrs.option(attrs.source(), default = None),
         "spago_dhall": attrs.option(attrs.source(), default = None),
+        "packages_dhall": attrs.option(attrs.source(), default = None),
         "main": attrs.string(default = "Main"),
         "index_html": attrs.option(attrs.source(), default = None),
         "style_css": attrs.option(attrs.source(), default = None),

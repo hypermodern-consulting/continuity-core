@@ -7,6 +7,7 @@ purescript_app(
         "src/Component/Todo.purs",
     ],
     spago_dhall = "spago.dhall",
+    packages_dhall = "packages.dhall",
     index_html = "index.html",
     style_css = "style.css",
 )

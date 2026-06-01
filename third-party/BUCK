@@ -1,27 +1,44 @@
-# third-party/BUCK — generated from continuity library spec
+# third-party/BUCK — C++ libraries resolved by Nix
 #
-# Each target reads include/lib paths from .buckconfig.local [lib.*] sections.
-# Nix resolves store paths; this file just references them.
+# Paths come from .buckconfig.local [lib.*] sections.
 
-def _lib(name):
-    """Create a prebuilt_cxx_library from buckconfig [lib.name] section."""
-    include = read_root_config("lib.{}".format(name), "include", "")
-    lib_dir = read_root_config("lib.{}".format(name), "lib", "")
-    libs = read_root_config("lib.{}".format(name), "libs", "")
+prebuilt_cxx_library(
+    name = "curl",
+    header_dirs = [read_root_config("lib.curl", "include", "")],
+    exported_linker_flags = [
+        "-L" + read_root_config("lib.curl", "lib", ""),
+        "-lcurl",
+    ],
+    visibility = ["PUBLIC"],
+)
 
-    if not include:
-        fail("Library '{}' not configured. Add to continuity.libraries.cxx in flake.nix".format(name))
+prebuilt_cxx_library(
+    name = "zlib",
+    header_dirs = [read_root_config("lib.zlib", "include", "")],
+    exported_linker_flags = [
+        "-L" + read_root_config("lib.zlib", "lib", ""),
+        "-lz",
+    ],
+    visibility = ["PUBLIC"],
+)
 
-    prebuilt_cxx_library(
-        name = name,
-        header_dirs = [include],
-        exported_linker_flags = [
-            "-L" + lib_dir,
-        ] + libs.split(" "),
-        visibility = ["PUBLIC"],
-    )
+prebuilt_cxx_library(
+    name = "openssl",
+    header_dirs = [read_root_config("lib.openssl", "include", "")],
+    exported_linker_flags = [
+        "-L" + read_root_config("lib.openssl", "lib", ""),
+        "-lssl",
+        "-lcrypto",
+    ],
+    visibility = ["PUBLIC"],
+)
 
-_lib("curl")
-_lib("zlib")
-_lib("openssl")
-_lib("simdjson")
+prebuilt_cxx_library(
+    name = "simdjson",
+    header_dirs = [read_root_config("lib.simdjson", "include", "")],
+    exported_linker_flags = [
+        "-L" + read_root_config("lib.simdjson", "lib", ""),
+        "-lsimdjson",
+    ],
+    visibility = ["PUBLIC"],
+)
