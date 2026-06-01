@@ -1,4 +1,4 @@
-import Continuity.Build.Vis
+import Continuity.Build.Core.Vis
 
 set_option autoImplicit false
 

@@ -125,7 +125,7 @@ structure ZlibDecompressor where
   consumption_bound : ∀ bs data consumed,
     inflate bs = some (data, consumed) → consumed ≤ bs.size
 
-theorem zlib_deterministic (z : ZlibDecompressor) (bs : Bytes) :
+theorem zlib_option_some_inj (z : ZlibDecompressor) (bs : Bytes) :
     ∀ r1 r2, z.inflate bs = some r1 → z.inflate bs = some r2 → r1 = r2 := by
   intro r1 r2 h1 h2; rw [h1] at h2; exact Option.some.inj h2
 

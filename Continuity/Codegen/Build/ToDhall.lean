@@ -1,11 +1,9 @@
-import Continuity.Build.Triple
-import Continuity.Build.Dep
-import Continuity.Build.Vis
-import Continuity.Build.Resource
-import Continuity.Build.Toolchain
-import Continuity.Build.Cxx
-import Continuity.Build.Library
-import Continuity.Build.BzlFile
+import Continuity.Build.Core.Triple
+import Continuity.Build.Core.Dependency
+import Continuity.Build.Core.Vis
+import Continuity.Build.Core.Resource
+import Continuity.Build.Rule.Cxx
+import Continuity.Build.Core.Library
 import Continuity.Codegen.AST.Dhall.Ast
 import Continuity.Codegen.AST.Dhall.Render
 import Continuity.Codegen.AST.Dhall.Build

@@ -1,8 +1,8 @@
-import Continuity.Build.Triple
-import Continuity.Build.Dep
-import Continuity.Build.Resource
-import Continuity.Build.Digest
-import Continuity.Build.Command
+import Continuity.Build.Core.Triple
+import Continuity.Build.Core.Dependency
+import Continuity.Build.Core.Resource
+import Continuity.Build.Core.Digest
+import Continuity.Build.Core.Command
 
 set_option autoImplicit false
 
@@ -69,7 +69,7 @@ structure Action where
   -- what to run
   command   : Command
   -- content-addressed input references
-  inputs    : List Digest
+  inputs    : List SHA256Digest
   -- what gets produced
   outputs   : List OutputSpec
   -- coeffect requirements
@@ -99,7 +99,7 @@ class ToBuildSpec (α : Type) where
 instance : ToBuildSpec Action where
   toBuildSpec a :=
     { name      := a.name
-    , deps      := []  -- `Action`s reference `Digest`s, not `Dep`s
+    , deps      := []  -- `Action`s reference `SHA256Digest`s, not `Dep`s
     , outputs   := a.outputs.map OutputSpec.path
     , resources := a.resources
     , system    := a.platform }

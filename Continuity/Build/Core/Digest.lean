@@ -26,11 +26,13 @@ namespace Continuity.Build
 /-
   Content hashing for the build model.
 
+  sha256 is currently the only supported digest. BLAKE3 and SHA-512
+  types are defined in `Crypto/Core.lean` as ByteArray stubs pending
+  verified implementations.
+
   Wraps `SHA256Hash` — the 32-byte invariant is enforced by the type.
   Collision resistance derives from `Crypto.hash_injective`. No axioms
-  in this file. `HashAlgo` is provided for future extensibility to
-  `SHA-512` and `BLAKE3`, though the concrete `Digest` structure
-  currently only uses `SHA-256`.
+  in this file.
 -/
 
 open Continuity.Crypto.SHA256
@@ -39,44 +41,36 @@ open Continuity.Crypto.SHA256
 ---                                                              // core // hash
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-inductive HashAlgo where
-  | sha256 | sha512 | blake3
-  deriving Repr, DecidableEq, Inhabited
-
-structure Digest where
-  algo : HashAlgo
+structure SHA256Digest where
   hash : SHA256Hash
   deriving DecidableEq
 
-namespace Digest
+namespace SHA256Digest
 
-def ofBytes (bs : ByteArray) : Digest :=
-  ⟨.sha256, hashToSHA256 bs⟩
+def ofBytes (bs : ByteArray) : SHA256Digest :=
+  ⟨hashToSHA256 bs⟩
 
-def hex (d : Digest) : String := toHex d.hash.bytes
+def hex (d : SHA256Digest) : String := toHex d.hash.bytes
 
-def render (d : Digest) : String :=
-  let pfx := match d.algo with
-    | .sha256 => "sha256" | .sha512 => "sha512" | .blake3 => "blake3"
-  s!"{pfx}:{d.hex}"
+def render (d : SHA256Digest) : String :=
+  s!"sha256:{d.hex}"
 
-instance : Repr Digest where
+instance : Repr SHA256Digest where
   reprPrec d _ := Std.Format.text (d.render)
 
-instance : Inhabited Digest where
+instance : Inhabited SHA256Digest where
   default := ofBytes ByteArray.empty
 
-end Digest
+end SHA256Digest
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ---                                                     // property // collision
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
--- collision resistance follows from `Crypto.hash_injective` — no
--- new axiom needed, we derive it
-theorem digest_collision_resistance (a b : ByteArray)
-    (h : Digest.ofBytes a = Digest.ofBytes b) :
+-- `SHA256Digest.mk` is injective, which follows from `Crypto.hash_injective`.
+theorem digest_mk_inj (a b : ByteArray)
+    (h : SHA256Digest.ofBytes a = SHA256Digest.ofBytes b) :
     hashToSHA256 a = hashToSHA256 b := by
-  simp only [Digest.ofBytes, Digest.mk.injEq] at h; exact h.2
+  simp only [SHA256Digest.ofBytes, SHA256Digest.mk.injEq] at h; exact h
 
 end Continuity.Build

@@ -1,7 +1,7 @@
 import Continuity.Straylight.CAS
 import Continuity.Nix.Derivation
-import Continuity.Build.Action
-import Continuity.Build.Command
+import Continuity.Build.Core.Action
+import Continuity.Build.Core.Command
 
 set_option autoImplicit false
 

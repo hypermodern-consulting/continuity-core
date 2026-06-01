@@ -1,5 +1,5 @@
-import Continuity.Build.Dep
-import Continuity.Build.Vis
+import Continuity.Build.Core.Dependency
+import Continuity.Build.Core.Vis
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

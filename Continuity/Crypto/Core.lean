@@ -1,5 +1,11 @@
 set_option autoImplicit false
 
+-- sha-256 is currently the only supported digest in `Build/SHA256Digest`.
+-- `SHA-512` and `BLAKE3` are defined here as `ByteArray` stubs pending
+-- verified implementations.
+abbrev SHA512Hash := ByteArray
+abbrev BLAKE3Hash := ByteArray
+
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
       "COUNT ZERO INTERRUPT—On receiving an interrupt, decrement the

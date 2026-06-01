@@ -1,4 +1,4 @@
-import Continuity.Build.Dep
+import Continuity.Build.Core.Dependency
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
