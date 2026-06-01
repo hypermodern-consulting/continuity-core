@@ -60,7 +60,7 @@ Then: direnv reload
     ld = read_root_config("cxx", "ld", "ld.lld")
     mdspan_include = read_root_config("nv", "mdspan_include", "")
 
-    compile_flags = ["-x", "cuda", "--cuda-path=" + nvidia_sdk_path, "-isystem", nvidia_sdk_include, "-std=c++23", "-c", "-fno-zero-call-used-regs=used"]
+    compile_flags = ["-x", "cuda", "--cuda-path=" + nvidia_sdk_path, "-isystem", nvidia_sdk_include, "-std=c++23", "-c"]
     if ptxas:
         compile_flags.extend(["--ptxas-path=" + ptxas])
     for arch in nv_archs:
@@ -139,7 +139,7 @@ Then: direnv reload
     nv_archs_str = read_root_config("nv", "archs", "sm_90")
     nv_archs = nv_archs_str.split(",")
 
-    compile_flags = ["-x", "cuda", "--cuda-path=" + nvidia_sdk_path, "-isystem", nvidia_sdk_include, "-std=c++17", "-c", "-fno-zero-call-used-regs=used"]
+    compile_flags = ["-x", "cuda", "--cuda-path=" + nvidia_sdk_path, "-isystem", nvidia_sdk_include, "-std=c++17", "-c"]
     if ptxas:
         compile_flags.extend(["--ptxas-path=" + ptxas])
     for arch in nv_archs:

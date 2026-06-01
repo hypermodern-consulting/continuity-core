@@ -89,7 +89,7 @@
         (lib.optionals cfg.toolchains.cuda [
           pkgs.cudaPackages.cuda_nvcc
           pkgs.cudaPackages.cuda_cudart
-          pkgs.llvmPackages_19.clang-unwrapped  # direct GC root — buckconfig references this
+          pkgs.llvmPackages_19.clang-unwrapped  # direct GC root for nv.bzl
         ])
       ];
     in
@@ -199,6 +199,11 @@
               if [ -f lakefile.lean ] || [ -f BUCK ]; then
                 rm -f .buckconfig.local
                 ln -sf ${buckconfig} .buckconfig.local
+              fi
+            '' + lib.optionalString cfg.toolchains.cuda ''
+              if ! [ -x "${pkgs.llvmPackages_19.clang-unwrapped}/bin/clang++" ]; then
+                echo "WARNING: clang-unwrapped not found at ${pkgs.llvmPackages_19.clang-unwrapped}/bin/clang++"
+                echo "Run: nix-store --realise ${pkgs.llvmPackages_19.clang-unwrapped}"
               fi
             '';
           };
