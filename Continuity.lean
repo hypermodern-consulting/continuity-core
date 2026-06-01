@@ -62,6 +62,7 @@ import Continuity.Codegen.Build.ToStarlark
 import Continuity.Codegen.Build.BzlDefs
 import Continuity.Codegen.Derive.Build
 import Continuity.Codegen.Derive.Codec
+import Continuity.Codegen.Derive.StateMachine
 import Continuity.Crypto.Core
 import Continuity.Crypto.SHA256
 import Continuity.Nix.Derivation
