@@ -210,6 +210,12 @@ def hashToSHA256 (msg : ByteArray) : SHA256Hash :=
 
 def hashStringToSHA256 (s : String) : SHA256Hash := hashToSHA256 s.toUTF8
 
+instance : Inhabited SHA256Hash :=
+  ⟨hashToSHA256 ByteArray.empty⟩
+
+instance : Repr SHA256Hash where
+  reprPrec h _ := "SHA256<" ++ toString h.bytes.size ++ " bytes>"
+
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ---                                                       // hex // encoding
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

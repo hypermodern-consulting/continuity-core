@@ -1,3 +1,5 @@
+import Continuity.Codegen.Derive.BoxCodegen
+
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -19,38 +21,26 @@ set_option autoImplicit false
 
 namespace Continuity.Codegen.Derive.Codec
 
-/-
-  Derive codec codegen — unified entry point for Codec/Protocol/ type derivations.
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Wire Box combinators → C++ / Haskell codegen.
 
-  Walks the protocol type definitions (Git, Protobuf, Nix, HTTP, etc.)
-  and produces C++ and Haskell codec AST output with renderable text.
+  Each verified Box (u8, u32le, u64le, len_prefixed, etc.) in
+  Codec/Core/Box.lean and Codec/Core/Bytes.lean is reflected as a BoxSpec.
+  The spec is lowered into C++ parse_xxx/serialize_xxx function pairs and
+  Haskell parse_xxx/serialize_xxx functions. All target code is generated
+  from the spec — the wire format is identical to the proven Lean codec.
 
-  Currently produces empty stubs. The real derivation requires Lean
-  metaprogramming to walk inductive type definitions and generate
-  serializers/deserializers for each protocol format — this is Phase 3 work.
-
-  The framework is in place: `deriveCppCodecs` and `deriveHaskellCodecs`
-  return `List (String × String)` pairs of (filename, rendered text).
+  Phase 3.1 (C++) and 3.2 (Haskell) are complete.
 -/
 
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                            // cpp // codecs
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+open Continuity.Codegen.Derive.BoxCodegen
 
-def deriveCppCodecs : List (String × String) := []
+def deriveCppCodecs : List (String × String) :=
+  BoxCodegen.deriveCppCodecs
 
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                       // haskell // codecs
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def deriveHaskellCodecs : List (String × String) :=
+  BoxCodegen.deriveHaskellCodecs
 
-def deriveHaskellCodecs : List (String × String) := []
-
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                // backward-compat // aliases
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
--- these names match what Main.lean currently references, to minimize
--- the delta during the transition from the old Codec/ files.
 def cppCodecFiles : List (String × String) := deriveCppCodecs
 def hsCodecFiles : List (String × String) := deriveHaskellCodecs
 

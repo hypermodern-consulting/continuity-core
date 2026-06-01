@@ -125,7 +125,29 @@ def emitCppPrimitives : String :=
   "    T value;\n" ++
   "    std::span<const uint8_t> remaining;\n" ++
   "    Grade grade;\n" ++
+  "    bool _ok = false;\n\n" ++
+  "    constexpr ParseResult() = default;\n" ++
+  "    constexpr ParseResult(T v, std::span<const uint8_t> r, Grade g = grade_unit)\n" ++
+  "        : value(std::move(v)), remaining(r), grade(g), _ok(true) {}\n\n" ++
+  "    constexpr bool has_value() const { return _ok; }\n" ++
+  "    constexpr explicit operator bool() const { return _ok; }\n\n" ++
+  "    T* operator->() { return &value; }\n" ++
+  "    const T* operator->() const { return &value; }\n" ++
+  "    T& operator*() { return value; }\n" ++
+  "    const T& operator*() const { return value; }\n" ++
   "};\n\n" ++
+  "// ── ok/fail helpers ────────────────────────────────────────────\n" ++
+  "// CTAD-compatible constructors for ergonomic generated code.\n\n" ++
+  "template<typename T>\n" ++
+  "[[nodiscard]] constexpr ParseResult<T> ok(T value, std::span<const uint8_t> remaining, Grade g = grade_unit) {\n" ++
+  "    return ParseResult<T>{std::move(value), remaining, g};\n" ++
+  "}\n\n" ++
+  "inline constexpr struct Fail {\n" ++
+  "    template<typename T>\n" ++
+  "    [[nodiscard]] constexpr operator ParseResult<T>() const {\n" ++
+  "        return ParseResult<T>{};\n" ++
+  "    }\n" ++
+  "} fail{};\n\n" ++
   "// ── Grade lifters ──────────────────────────────────────────────\n" ++
   "// Each lifter applies a verification step and adds the\n" ++
   "// corresponding coeffect label to the ParseResult's grade.\n" ++

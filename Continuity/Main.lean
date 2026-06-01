@@ -1,6 +1,8 @@
 import Continuity.Nix.Derivation
 import Continuity.Codegen.Derive.Build
 import Continuity.Codegen.Derive.Codec
+import Continuity.Codegen.Derive.StateMachine
+import Continuity.Codegen.Derive.TestVectors
 import Continuity.CLI.InitBuck2
 import Continuity.Codegen.Algebra.Effect
 import Continuity.Crypto.SHA256
@@ -28,6 +30,8 @@ namespace Continuity
 
 open Continuity.Codegen.Derive.Build
 open Continuity.Codegen.Derive.Codec
+open Continuity.Codegen.Derive.StateMachine
+open Continuity.Codegen.Derive.TestVectors
 open Continuity.Codegen.AST.Dhall
 open Continuity.Codegen.AST.Starlark
 open Continuity.CLI.InitBuck2
@@ -52,8 +56,21 @@ def cmdGenerate (outDir : String) : IO Unit := do
     IO.FS.createDirAll dir
     IO.FS.writeFile fullPath content
     IO.println s!"  wrote {path}"
+  -- Phase 3.5: test vectors from Lean evaluation
+  let testVectorsPath := s!"{outDir}/test/codec_test_vectors.cpp"
+  let testVectorsDir := System.FilePath.mk testVectorsPath |>.parent |>.getD (System.FilePath.mk ".")
+  IO.FS.createDirAll testVectorsDir
+  IO.FS.writeFile testVectorsPath deriveCppTests
+  IO.println s!"  wrote test/codec_test_vectors.cpp"
+  -- Phase 5.2/5.4: state machine headers (C++)
+  for (path, content) in cppStateMachineFiles do
+    let fullPath := s!"{outDir}/{path}"
+    let dir := System.FilePath.mk fullPath |>.parent |>.getD (System.FilePath.mk ".")
+    IO.FS.createDirAll dir
+    IO.FS.writeFile fullPath content
+    IO.println s!"  wrote {path}"
   let total := preludeFiles.length + cppCodecFiles.length + hsCodecFiles.length +
-    hsPrimitivesFiles.length + cppPrimitivesFiles.length
+    hsPrimitivesFiles.length + cppPrimitivesFiles.length + cppStateMachineFiles.length
 
   -- `Grade` module (Haskell + C++)
   let gradeHsPath := s!"{outDir}/grade/Continuity/Grade.hs"
@@ -121,6 +138,10 @@ def cmdGenerate (outDir : String) : IO Unit := do
     manifest := Continuity.Nix.Derivation.writeLPStr manifest content
 
   for (path, content) in hsPrimitivesFiles do
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
+
+  for (path, content) in cppStateMachineFiles do
     manifest := Continuity.Nix.Derivation.writeLPStr manifest path
     manifest := Continuity.Nix.Derivation.writeLPStr manifest content
 
