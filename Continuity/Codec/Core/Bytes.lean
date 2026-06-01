@@ -1,33 +1,43 @@
-
 import Continuity.Codec.Core.Box
 
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                 // continuity // codec // bytes
-                                                                      bytes.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  Byte-level codec primitives built on top of Box.
+      "The data had never been intended for human input. It moved beneath
+      the surface in packets, in raw bytes stripped of all the comfortable
+      conventions that made the world legible to the eye. To read it at
+      all was to unlearn language. Every fixed-width field, every length
+      prefix, every count of bytes consumed — these were the glyphs of
+      a grammar that predated the user and would survive long after.
 
-  `takeN`         — parse exactly n bytes
-  `FixedBytes n`  — n-byte value with size proof
-  `fixedBytes n`  — Box for FixedBytes
-  `LenPrefixed`   — u64le length + payload
-  `lenPrefixed`   — Box for LenPrefixed
+      She had seen the code behind the code, the bones beneath the skin
+      of the matrix. Once you learned to read the raw streams, nothing
+      looked the same. The world resolved into its components."
 
-  All fully proven. Zero sorry.
--/
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Codec.Core.Bytes
 
+/-
+  Byte-level codec primitives built on top of `Box`.
+
+    `takeN`        — parse exactly n bytes
+    `FixedBytes n` — n-byte value with size proof
+    `fixedBytes n` — `Box` for `FixedBytes n`
+    `LenPrefixed`  — u64le length + payload
+    `lenPrefixed`  — `Box` for `LenPrefixed`
+
+  all fully proven. zero sorry.
+-/
+
 open Continuity.Codec.Core.Box
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                    // take n
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                     // take n
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def takeN (n : Nat) (bs : Bytes) : ParseResult Bytes :=
   if _ : bs.size ≥ n then .ok (bs.extract 0 n) (bs.extract n bs.size) else .fail
@@ -43,17 +53,14 @@ theorem takeN_append_of_size_eq (data extra : ByteArray) (n : Nat) (h : data.siz
   congr 1; exact ByteArray.extract_append_eq_left rfl
   exact ByteArray.extract_append_eq_right rfl rfl
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                // fixed bytes
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                               // fixed bytes
-   ════════════════════════════════════════════════════════════════════════════════ -/
-
-/-- A byte array of exactly n bytes, with proof. -/
 structure FixedBytes (n : Nat) where
   data : ByteArray
   size_eq : data.size = n
 
-/-- Box for FixedBytes n: parse exactly n bytes, roundtrip proven. -/
 def fixedBytes (n : Nat) : Box (FixedBytes n) where
   parse bs := match takeN n bs with
     | .ok data rest => if h : data.size = n then .ok ⟨data, h⟩ rest else .fail
@@ -66,13 +73,10 @@ def fixedBytes (n : Nat) : Box (FixedBytes n) where
     rw [takeN_append_of_size_eq fb.data extra n fb.size_eq]
     simp only [fb.size_eq, ↓reduceDIte]
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                            // length-prefixed
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                           // length-prefixed
-   ════════════════════════════════════════════════════════════════════════════════ -/
-
-/-- A length-prefixed byte array: u64le length followed by payload.
-    Bound ensures the length fits in a u64. -/
 structure LenPrefixed where
   data : ByteArray
   bound : data.size < 2 ^ 64
@@ -81,7 +85,6 @@ private theorem size_u64_roundtrip (n : Nat) (h : n < 2 ^ 64) :
     (UInt64.ofNat n).toNat = n := by
   simp [UInt64.ofNat, UInt64.toNat]; omega
 
-/-- Box for LenPrefixed: u64le length prefix + payload. -/
 def lenPrefixed : Box LenPrefixed where
   parse bs :=
     match u64le.parse bs with
@@ -103,16 +106,15 @@ def lenPrefixed : Box LenPrefixed where
     rw [takeN_append_of_size_eq lp.data extra lp.data.size rfl]
     simp only [lp.bound, ↓reduceDIte]
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                           // specializations
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                            // specializations
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def bytes32 : Box (FixedBytes 32) := fixedBytes 32
 def bytes20 : Box (FixedBytes 20) := fixedBytes 20
 def bytes64 : Box (FixedBytes 64) := fixedBytes 64
 
-/-- Hex representation for Bytes -/
+-- hex representation for bytes
 instance : Repr Bytes where
   reprPrec bs _ :=
     let hex := bs.toList.map fun b =>

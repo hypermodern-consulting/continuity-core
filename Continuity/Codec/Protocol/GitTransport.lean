@@ -3,7 +3,39 @@ import Continuity.Codec.Protocol.Protocol
 
 set_option autoImplicit false
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "He flew on. His credit chip was a rectangle of black mirror,
+      edged with gold, and the data moved beneath its surface like
+      something alive in dark water. Packets broke apart and reformed,
+      each one carrying its own small negotiation — an ACK, a NAK,
+      a sideband of meaning threading through the static. In the
+      thin space between sender and receiver, everything was
+      capability, everything was a request to speak or to listen,
+      to push or to pull, a conversation compressed into lines
+      of hexadecimal intent."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 namespace Continuity.Codec.Protocol.GitTransport
+/-
+  The Git Transport Protocol.
+
+  Negotiation layer for reference advertisement and pack
+  transfer over a streaming channel. Uses `PktLine` framing
+  with special flush, delim, and response-end markers to
+  delineate messages. Multiplexes pack data, progress,
+  and error output via `SideBand`.
+
+  Capability declarations in the first pkt-line of a
+  `Ref` advertisement negotiate optional features:
+  multi-ack, thin packs, shallow clones, and more.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // parse // pkt-line
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 open Continuity.Codec.Core.Box
 open Continuity.Codec.Protocol.Protocol
@@ -17,7 +49,7 @@ inductive PktLine where
 def parsePktLine (bs : Bytes) : ParseResult PktLine :=
   if _ : bs.size >= 4 then
     let hex := bs.extract 0 4
-    
+
     if hex.data == #[0x30, 0x30, 0x30, 0x30] then
       .ok .flush (bs.extract 4 bs.size)
     else if hex.data == #[0x30, 0x30, 0x30, 0x31] then
@@ -31,8 +63,12 @@ def parsePktLine (bs : Bytes) : ParseResult PktLine :=
         if 4 + len ≤ bs.size then
           .ok (.data (bs.extract 4 (4 + len))) (bs.extract (4 + len) bs.size)
         else .fail
-        
+
   else .fail
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // core // capability
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 inductive Capability where
   | multiAck | multiAckDetailed | noDone | thinPack
@@ -44,6 +80,10 @@ inductive Capability where
   | objectFormat (fmt : String)
   deriving Repr
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // parse // sideband
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 inductive SideBandChannel where
   | packData | progress | error
   deriving Repr, DecidableEq
@@ -51,13 +91,13 @@ inductive SideBandChannel where
 def parseSideBand (bs : Bytes) : ParseResult (SideBandChannel × Bytes) :=
   if _ : bs.size > 0 then
     let rest := bs.extract 1 bs.size
-    
+
     match bs.data[0]! with
     | 1 => .ok (.packData, rest) ByteArray.empty
     | 2 => .ok (.progress, rest) ByteArray.empty
     | 3 => .ok (.error, rest) ByteArray.empty
     | _ => .fail
-    
+
   else .fail
 
 end Continuity.Codec.Protocol.GitTransport

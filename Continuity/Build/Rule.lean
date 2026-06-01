@@ -5,16 +5,37 @@ import Continuity.Build.Lean4
 import Continuity.Build.Nv
 import Continuity.Build.Genrule
 
+set_option autoImplicit false
+
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                // continuity // build // rule
 
-   "The Finn, Bobby remembered, was a dealer in stolen anything."
-                                                                 — Count Zero
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+      "He was a specialist in the extraction of top executives and research
+      people, and he knew his work. He knew how to move through the
+      intricate lattices of corporate security, how to read the codes
+      that governed access, how to find the seams where one system
+      gave way to another. It was not a matter of breaking rules but
+      of knowing which rules applied where, and when they didn't."
 
-/-! Rule union — all build rules as a single discriminated union. -/
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Build
+
+/-
+  The Build Rule Union.
+
+  All build rules as a single discriminated union. Each constructor
+  wraps a language-specific rule type. The union allows a build graph
+  to be heterogeneous — a `Cxx` binary can depend on a `Rust` library
+  which depends on a `genrule` which shells out to `Nv`.
+
+  Language modules: `Cxx`, `Rs`, `Hs`, `Ln`, `Nv`, `Genrule`.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // rules // the union
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 inductive Rule where
   | cxxBinary         : Cxx.Binary     → Rule

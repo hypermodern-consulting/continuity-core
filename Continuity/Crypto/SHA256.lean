@@ -1,20 +1,33 @@
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                              // continuity // crypto // sha256
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  Pure Lean 4 implementation of FIPS 180-4 (SHA-256).
-  No FFI. No libraries. Just arithmetic.
+      "I speak as one who can no longer tolerate that simple state, the
+      cells of my body having opted for the quixotic pursuit of individual
+      careers." Sixty-four rounds of transformation, each bit churning
+      through its appointed function — `Ch`, `Maj`, `Σ₀`, `Σ₁` — the
+      message schedule expanding and compressing until the initial state
+      was lost beyond recovery. You could reconstruct nothing from the
+      output, not a single preimage, not a single collision. That was the
+      point. That was the one axiom on which everything else depended.
 
-  Kernel-distance, not toolchain-distance.
-  Collision resistance is the one axiom (Crypto.lean).
--/
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Crypto.SHA256
 
--- §1 Word operations (FIPS 180-4 §3.2, §4.1.2)
+/-
+  Pure `Lean 4` implementation of FIPS 180-4 (`SHA-256`).
+  No FFI. No libraries. Just arithmetic.
+
+  Kernel-distance, not toolchain-distance.
+  Collision resistance is the one axiom (`Crypto/Core.lean`).
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                              // fips // word // operations
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 abbrev Word := UInt32
 
@@ -27,7 +40,9 @@ abbrev Word := UInt32
 @[inline] def smallSigma0 (x : Word) : Word := rotr 7 x ^^^ rotr 18 x ^^^ shr 3 x
 @[inline] def smallSigma1 (x : Word) : Word := rotr 17 x ^^^ rotr 19 x ^^^ shr 10 x
 
--- §2 Constants (cube roots of first 64 primes)
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                    // fips // constants
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def K : Array Word := #[
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
@@ -47,13 +62,13 @@ def K : Array Word := #[
   0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
   0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]
 
--- §3 Initial hash values (square roots of first 8 primes)
-
 def H0 : Array Word := #[
   0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
   0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
 
--- §4 Preprocessing
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                // fips // preprocessing
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def decodeBE32 (b : Array UInt8) (i : Nat) : Word :=
   let b0 := (b.getD i 0).toUInt32
@@ -82,7 +97,9 @@ def pad (msg : ByteArray) : ByteArray :=
   let padded := padded.push bitLen.toUInt8
   padded
 
--- §5 Message schedule
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                            // fips // message // schedule
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def messageSchedule (block : Array UInt8) (offset : Nat) : Array Word :=
   let W := (Array.range 16).map fun i => decodeBE32 block (offset + i * 4)
@@ -92,10 +109,11 @@ def messageSchedule (block : Array UInt8) (offset : Nat) : Array Word :=
             smallSigma0 (W.getD (t-15) 0) + W.getD (t-16) 0)
   ) W
 
--- §6 Compression
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                // fips // compression
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure State where
-
   a : Word
   b : Word
   c : Word
@@ -120,7 +138,9 @@ def compress (H : Array Word) (block : Array UInt8) (offset : Nat) : Array Word 
   #[H.getD 0 0 + s.a, H.getD 1 0 + s.b, H.getD 2 0 + s.c, H.getD 3 0 + s.d,
     H.getD 4 0 + s.e, H.getD 5 0 + s.f, H.getD 6 0 + s.g, H.getD 7 0 + s.hh]
 
--- §7 Hash computation
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                           // fips // hash // computation
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def hash (msg : ByteArray) : ByteArray :=
   let padded := pad msg
@@ -130,17 +150,13 @@ def hash (msg : ByteArray) : ByteArray :=
 
 def hashString (s : String) : ByteArray := hash s.toUTF8
 
--- §7a Size proofs
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                       // size // proofs
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-
--- compress returns an 8-element array literal
--- The proof is structural: #[a,b,c,d,e,f,g,h].size = 8
--- but unfold+simp can't close it because messageSchedule/round
--- contain dependent folds. We use the explicit construction.
--- compress returns #[H0+a, H1+b, H2+c, H3+d, H4+e, H5+f, H6+g, H7+h]
--- This is an 8-element array literal. Size = 8 by construction.
--- Axiomatized because unfold+rfl can't reduce through 64 rounds of folds.
--- Validated by #eval: (compress H0 (pad "".toUTF8).data 0).size = 8
+-- `compress` returns an 8-element array literal `#[a,b,c,d,e,f,g,h]`.
+-- the proof is structural but `unfold`+`simp` can't close it through
+-- 64 rounds of dependent folds. validated by `#eval`.
 axiom compress_size (H : Array Word) (block : Array UInt8) (offset : Nat) :
     (compress H block offset).size = 8
 
@@ -154,16 +170,17 @@ private def finalize (H : Array Word) : ByteArray := ⟨
   encodeBE32 (H.getD 4 0) ++ encodeBE32 (H.getD 5 0) ++
   encodeBE32 (H.getD 6 0) ++ encodeBE32 (H.getD 7 0)⟩
 
--- Each encodeBE32 produces 4 bytes; 8 concatenated = 32.
--- We axiomatize this because Lean's Array.size_append + simp
--- can't close the 7-deep append chain without heartbeat issues.
--- Validated by NIST test vectors (#eval test_abc).
+-- each `encodeBE32` produces 4 bytes; 8 concatenated = 32.
+-- `Array.size_append`+`simp` can't close the 7-deep append chain
+-- without heartbeat issues. validated by NIST test vectors.
 axiom finalize_size_ax (H : Array Word) : (finalize H).size = 32
 
 theorem finalize_size (H : Array Word) (_h : H.size = 8) :
     (finalize H).size = 32 := finalize_size_ax H
 
--- §7b SHA256Hash refinement type
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                  // refinement // type
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure SHA256Hash where
   bytes : ByteArray
@@ -193,7 +210,9 @@ def hashToSHA256 (msg : ByteArray) : SHA256Hash :=
 
 def hashStringToSHA256 (s : String) : SHA256Hash := hashToSHA256 s.toUTF8
 
--- §8 Hex encoding
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                       // hex // encoding
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def hexChar (n : UInt8) : Char :=
   if n < 10 then Char.ofNat (n.toNat + 48) else Char.ofNat (n.toNat + 87)
@@ -204,12 +223,16 @@ def toHex (bs : ByteArray) : String :=
 def hashHex (msg : ByteArray) : String := toHex (hash msg)
 def hashStringHex (s : String) : String := toHex (hashString s)
 
--- §9 Properties
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                        // properties
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 theorem deterministic (msg : ByteArray) : hash msg = hash msg := rfl
 theorem functional (m1 m2 : ByteArray) (h : m1 = m2) : hash m1 = hash m2 := by rw [h]
 
--- §10 NIST test vectors
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                              // nist // test // vectors
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def test_abc : String := hashStringHex "abc"
 def expected_abc : String := "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"

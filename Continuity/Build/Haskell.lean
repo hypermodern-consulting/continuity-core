@@ -2,14 +2,34 @@ import Continuity.Build.Dep
 import Continuity.Build.Vis
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                               // continuity // build // haskell
 
-   "Legba, Ougou Feray, Bakoulou Baka, Petro Simbi, you will
-    have what I have, my horse, all my horses."
-                                                                 — Count Zero
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+      "Silicon's on the way out, Turner. What rests beneath — the
+      irreducible, the actual layer of atoms — it's just another
+      abstraction once you learn to look at it right. The builder's
+      real medium isn't the substrate, silicon or gallium arsenide
+      or whatever comes next. It's the structure. The clean lines of
+      a well-constructed namespace. The moment the linker resolves
+      every symbol without complaint. That's craft. Everything else
+      is packaging, and packaging changes. The craft stays."
+
+                                                                   — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Build.Hs
+
+/-
+  haskell build targets.
+
+  defines `Binary`, `Library`, and `FFIBinary` — the three target
+  types for `ghc`-based builds. each carries source files,
+  `Dep`endencies, `ghcFlags`, and `Vis`ibility. `FFIBinary` adds
+  `cSrcs`, `cFlags`, and `ldFlags` for foreign-function builds.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // core // targets
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure Binary where
   name     : String

@@ -1,25 +1,36 @@
 import Continuity.Build.Triple
 
+set_option autoImplicit false
+
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                             // continuity // build // toolchain
-                                                                 toolchain.lean
 
-   "She was the white girl, the one who could access the Other Side."
+      "The knob was ridiculous, handmade, baleful; it was there to welcome
+      him back to Mexico, to the Conroy place, to the dry heat and the
+      high white walls and the bougainvillea drooping from the roof of
+      the veranda. Each tool in this place had a history, a provenance,
+      a reason for being exactly where it was. Someone had chosen every
+      piece with intent, had configured this environment to do work."
 
-                                                                 — Count Zero
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+                                                                    — Count Zero
 
-/-!
-  Toolchain types — what tools exist and how they're configured.
-  Types + default constructors + flag rendering, all one concept.
--/
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Build
 
+/-
+  Build Toolchains.
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                             // cxx toolchain
-   ════════════════════════════════════════════════════════════════════════════════ -/
+  Toolchain types and default constructors. Each structure models
+  a compiler or build tool with its flags and configuration. The
+  `mk'` constructors provide minimal defaults — just a name.
+
+  Bootstrap toolchains (`PythonBootstrap`, `GenruleToolchain`)
+  model non-compiler build tools that still need version tracking.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // cxx // toolchain
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure CxxToolchain where
   name          : String
@@ -30,10 +41,9 @@ structure CxxToolchain where
 
 def CxxToolchain.mk' (name : String) : CxxToolchain := { name }
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                         // haskell toolchain
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                     // haskell // toolchain
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure HaskellToolchain where
   name           : String
@@ -42,10 +52,9 @@ structure HaskellToolchain where
 
 def HaskellToolchain.mk' (name : String) : HaskellToolchain := { name }
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                            // lean toolchain
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                        // lean // toolchain
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure LeanToolchain where
   name       : String
@@ -54,10 +63,9 @@ structure LeanToolchain where
 
 def LeanToolchain.mk' (name : String) : LeanToolchain := { name }
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                            // rust toolchain
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                        // rust // toolchain
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure RustToolchain where
   name            : String
@@ -67,10 +75,9 @@ structure RustToolchain where
 
 def RustToolchain.mk' (name : String) : RustToolchain := { name }
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // nv toolchain
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // nv // toolchain
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure NvToolchain where
   name     : String
@@ -79,10 +86,9 @@ structure NvToolchain where
 
 def NvToolchain.mk' (name : String) : NvToolchain := { name }
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                      // execution platform
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                  // execution // platform
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure ExecutionPlatform where
   name           : String
@@ -92,10 +98,9 @@ structure ExecutionPlatform where
 
 def ExecutionPlatform.mk' (name : String) : ExecutionPlatform := { name }
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                        // bootstrap toolchains
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                    // bootstrap // toolchains
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure PythonBootstrap where
   name : String
@@ -104,6 +109,5 @@ structure PythonBootstrap where
 structure GenruleToolchain where
   name : String
   deriving Repr, Inhabited
-
 
 end Continuity.Build

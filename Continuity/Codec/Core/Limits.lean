@@ -5,26 +5,38 @@ import Continuity.Codec.Core.Bytes
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                // continuity // codec // limits
-                                                                     limits.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
+      "They were numbers now, pure and clean, stripped of the messy
+      contingencies of flesh and distance. Transfer rates, latency
+      ceilings, the hard limits that defined the possible. He had
+      learned to think in these terms, to see the world as a nested
+      set of constraints — bandwidth here, memory there, a budget
+      of milliseconds that had to stretch across the entire run.
+      Exceed any one of them and you lost everything. The art was
+      knowing exactly where the walls were, and learning to live
+      inside them without ever touching the surface."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
+namespace Continuity.Codec.Core.Limits
+/-
   Every magic constant in the codebase lives here.
-  Every one is connected to a `bounded` Box through Guards.
+  Every one is connected to a `Bounded` `Box` through `Guards`.
   Every one has an exhaustion theorem.
 
   Before this file existed, these constants were comments pretending
   to be security. Now they're types.
 -/
 
-namespace Continuity.Codec.Core.Limits
-
 open Continuity.Codec.Core.Box
 open Continuity.Codec.Core.Bytes
 open Continuity.Codec.Core.Guards
 
--- §1. CONSTANTS
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                             // constants
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def nixMaxStringBytes  : Nat := 16 * 1024 * 1024        -- 16 MB
 def nixMaxListElems    : Nat := 1024 * 1024              -- 1M elements
@@ -37,7 +49,9 @@ def zmtpMaxFrameBytes  : Nat := 256 * 1024 * 1024        -- 256 MB
 def protobufMaxMsgSize : Nat := 64 * 1024 * 1024         -- 64 MB
 def gitMaxPackObjects  : Nat := 16 * 1024 * 1024         -- 16M objects
 
--- §2. POSITIVITY
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                             // positivity
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 theorem nixMaxStringBytes_pos  : nixMaxStringBytes > 0  := by decide
 theorem nixMaxListElems_pos    : nixMaxListElems > 0    := by decide
@@ -50,7 +64,9 @@ theorem zmtpMaxFrameBytes_pos  : zmtpMaxFrameBytes > 0  := by decide
 theorem protobufMaxMsgSize_pos : protobufMaxMsgSize > 0 := by decide
 theorem gitMaxPackObjects_pos  : gitMaxPackObjects > 0  := by decide
 
--- §3. BOUNDED BOXES
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                       // bounded boxes
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def boundedNixString : Box (Bounded LenPrefixed lenPrefixed nixMaxStringBytes) :=
   bounded lenPrefixed nixMaxStringBytes
@@ -61,7 +77,9 @@ def boundedHttp2Frame : Box (Bounded LenPrefixed lenPrefixed http2MaxFrameDefaul
 def boundedZmtpFrame : Box (Bounded LenPrefixed lenPrefixed zmtpMaxFrameBytes) :=
   bounded lenPrefixed zmtpMaxFrameBytes
 
--- §4. BUDGET THEOREMS
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                     // budget theorems
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 theorem nix_string_budget :
     (1024 * 1024 * 1024) / nixMaxStringBytes = 64 := by native_decide
@@ -76,7 +94,9 @@ theorem http2_frames_total (fs : List (Bounded LenPrefixed lenPrefixed http2MaxF
     ≤ fs.length * http2MaxFrameDefault :=
   bounded_list_total lenPrefixed http2MaxFrameDefault fs
 
--- §5. DEPTH GUARD
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // depth guard
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def depthGuard {α : Type} (fuel : Nat) (f : Nat → ByteArray → ParseResult α) (bs : ByteArray)
     : ParseResult α :=
@@ -89,7 +109,9 @@ theorem depthGuard_zero {α : Type} (f : Nat → ByteArray → ParseResult α) (
 theorem depthGuard_succ {α : Type} (n : Nat) (f : Nat → ByteArray → ParseResult α) (bs : ByteArray) :
     depthGuard (n + 1) f bs = f n bs := by simp [depthGuard]
 
--- §6. NAME LENGTH
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // name length
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def checkNameLen (name : String) : Bool := name.toUTF8.size ≤ narMaxEntryName
 

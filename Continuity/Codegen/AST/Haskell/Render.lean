@@ -1,17 +1,26 @@
 import Continuity.Codegen.AST.Haskell.Ast
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                // continuity // emit // haskell
-                                                                    render.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  Haskell renderer — the ONLY place Haskell text is assembled.
+      "He flew on. His credit chip was a rectangle of black mirror, edged with
+      gold. In the chip's surface, the data that defined him, his history and
+      his credit and his passage through the world, lay embedded in a lattice
+      of coherent light. A code that could be read, rewritten, rendered into
+      whatever form the gate demanded."
+
+                                                                     — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
+namespace Continuity.Codegen.AST.Haskell
+
+/-
+  Haskell renderer — the ONLY place haskell text is assembled.
 
   Five render functions, one per syntactic category:
-    renderType, renderPat, renderExpr, renderDoStmt, renderDecl
+    `renderType`, `renderPat`, `renderExpr`, `renderDoStmt`, `renderDecl`
 
-  renderExpr and renderDoStmt are mutually recursive (do-blocks contain
+  `renderExpr` and `renderDoStmt` are mutually recursive (do-blocks contain
   expressions, expressions contain do-blocks).
 
   All indentation is explicit — the `ind` parameter tracks the current
@@ -19,12 +28,9 @@ import Continuity.Codegen.AST.Haskell.Ast
   programs, not just ugly ones.
 -/
 
-namespace Continuity.Codegen.AST.Haskell
-
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                     // helpers
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                      // helpers
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def pad (n : Nat) : String := "".pushn ' ' n
 
@@ -46,10 +52,9 @@ private def escapeChar (c : Char) : String :=
   | '\t' => "\\t"
   | c    => String.singleton c
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                 // render type
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                              // render // type
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 partial def renderType (ty : HsType) : String :=
   match ty with
@@ -90,10 +95,9 @@ partial def renderType (ty : HsType) : String :=
   | HsType.infixT op l r  => s!"{renderType l} {op} {renderType r}"
   | HsType.stringT value  => s!"\"{escapeStr value}\""
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // render pattern
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                            // render // pattern
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 partial def renderPat (pat : HsPat) : String :=
   match pat with
@@ -120,19 +124,18 @@ partial def renderPat (pat : HsPat) : String :=
     let fs := fields.map fun (name, pat) => s!"{name} = {renderPat pat}"
     s!"{con} \{ {", ".intercalate fs} }"
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                 // render // expression // do-stmts (mutual rec)
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                // render expression + do-stmts
-   ════════════════════════════════════════════════════════════════════════════════ -/
-
-/-! renderExpr and renderDoStmt are mutually recursive. -/
+-- `renderExpr` and `renderDoStmt` are mutually recursive.
 
 mutual
 
 partial def renderExpr (expr : HsExpr) (ind : Nat := 0) : String :=
   match expr with
 
-  -- ── literals ──────────────────────────────────────────────────────────────
+  -- literals
 
   | HsExpr.litInt n  => if n ≥ 0 then toString n else s!"({n})"
   | HsExpr.litStr s  => s!"\"{escapeStr s}\""
@@ -145,13 +148,13 @@ partial def renderExpr (expr : HsExpr) (ind : Nat := 0) : String :=
   | HsExpr.tuple elems =>
     "(" ++ ", ".intercalate (elems.map fun e => renderExpr e ind) ++ ")"
 
-  -- ── references ────────────────────────────────────────────────────────────
+  -- references
 
   | HsExpr.var name          => name
   | HsExpr.con name          => name
   | HsExpr.qual modName name => s!"{modName}.{name}"
 
-  -- ── application ───────────────────────────────────────────────────────────
+  -- application
 
   | HsExpr.app fn arg =>
     let argStr := match arg with
@@ -172,13 +175,13 @@ partial def renderExpr (expr : HsExpr) (ind : Nat := 0) : String :=
     -- right section: `(+ x)`
     s!"({op} {renderExpr side ind})"
 
-  -- ── lambda ────────────────────────────────────────────────────────────────
+  -- lambda
 
   | HsExpr.lam params body =>
     let ps := " ".intercalate (params.map renderPat)
     s!"\\{ps} -> {renderExpr body ind}"
 
-  -- ── binding ───────────────────────────────────────────────────────────────
+  -- binding
 
   | HsExpr.letIn bindings body =>
     let bindInd := pad (ind + 4)
@@ -196,18 +199,18 @@ partial def renderExpr (expr : HsExpr) (ind : Nat := 0) : String :=
       s!"{pad altInd}{renderPat pat} -> {renderExpr body altInd}"
     s!"case {renderExpr scrut ind} of\n{"\n".intercalate altLines}"
 
-  -- ── do-notation ───────────────────────────────────────────────────────────
+  -- do-notation
 
   | HsExpr.do_ stmts =>
     let stmtInd := ind + 2
     let stmtLines := stmts.map fun s => s!"{pad stmtInd}{renderDoStmt s stmtInd}"
     s!"do\n{"\n".intercalate stmtLines}"
 
-  -- ── type annotation ───────────────────────────────────────────────────────
+  -- type annotation
 
   | HsExpr.typed expr ty => s!"{renderExpr expr ind} :: {renderType ty}"
 
-  -- ── record ────────────────────────────────────────────────────────────────
+  -- record
 
   | HsExpr.recordCon con fields =>
     let fs := fields.map fun (name, expr) => s!"{name} = {renderExpr expr ind}"
@@ -217,7 +220,7 @@ partial def renderExpr (expr : HsExpr) (ind : Nat := 0) : String :=
     let fs := fields.map fun (name, e) => s!"{name} = {renderExpr e ind}"
     s!"{renderExpr expr ind} \{ {", ".intercalate fs} }"
 
-  -- ── other ─────────────────────────────────────────────────────────────────
+  -- other
 
   | HsExpr.parens inner => s!"({renderExpr inner ind})"
   | HsExpr.negate inner => s!"-{renderExpr inner ind}"
@@ -230,12 +233,11 @@ partial def renderDoStmt (stmt : DoStmt) (ind : Nat) : String :=
 
 end
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                       // render // declaration
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                          // render declaration
-   ════════════════════════════════════════════════════════════════════════════════ -/
-
-/-- render a data constructor -/
+-- render a data constructor.
 private def renderDataCon (dc : DataCon) : String :=
   match dc with
   | DataCon.positional name [] => name
@@ -245,7 +247,7 @@ private def renderDataCon (dc : DataCon) : String :=
     let fs := fields.map fun (n, t) => s!"{n} :: {renderType t}"
     s!"{name}\n    \{ {"\n    , ".intercalate fs}\n    }"
 
-/-- render a function clause (patterns + rhs + where) -/
+-- render a function clause (patterns + rhs + where).
 private def renderClause (name : String) (clause : FunClause) : String :=
   let lhs := if clause.patterns.isEmpty
     then name
@@ -326,10 +328,9 @@ partial def renderDecl (decl : HsDecl) : String :=
   | HsDecl.comment text => s!"-- {text}"
   | HsDecl.blank        => ""
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // render module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                            // render // module
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def renderModule (m : HsModule) : String :=
   -- split declarations into pragmas, imports, and everything else
@@ -355,14 +356,13 @@ def renderModule (m : HsModule) : String :=
   let sections := [pragmaBlock, moduleDecl, importBlock, bodyBlock].filter (· ≠ "")
   "\n\n".intercalate sections ++ "\n"
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                        // tests
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                       // tests
-   ════════════════════════════════════════════════════════════════════════════════ -/
+-- regression tests — every major render function gets coverage.
 
-/-! regression tests — every major render function gets coverage. -/
-
--- ── types ─────────────────────────────────────────────────────────────────────
+-- types
 
 #guard renderType (HsType.con "Int") == "Int"
 #guard renderType (HsType.var "a") == "a"
@@ -394,7 +394,7 @@ def renderModule (m : HsModule) : String :=
   [HsType.con "GLNet", HsType.con "GLCrypto"])
   == "'[GLNet, GLCrypto]"
 
--- ── patterns ──────────────────────────────────────────────────────────────────
+-- patterns
 
 #guard renderPat (HsPat.var "x") == "x"
 #guard renderPat (HsPat.wild) == "_"
@@ -403,7 +403,7 @@ def renderModule (m : HsModule) : String :=
 #guard renderPat (HsPat.tuple [HsPat.var "a", HsPat.var "b"]) == "(a, b)"
 #guard renderPat (HsPat.bang (HsPat.var "x")) == "!x"
 
--- ── expressions ───────────────────────────────────────────────────────────────
+-- expressions
 
 #guard renderExpr (HsExpr.litInt 42) == "42"
 #guard renderExpr (HsExpr.litStr "hello") == "\"hello\""
@@ -418,7 +418,7 @@ def renderModule (m : HsModule) : String :=
   (HsExpr.litInt 1) (HsExpr.litInt 0))
   == "if b then 1 else 0"
 
--- ── declarations ──────────────────────────────────────────────────────────────
+-- declarations
 
 #guard renderDecl (HsDecl.pragma "LANGUAGE" "StrictData")
   == "{-# LANGUAGE StrictData #-}"
@@ -433,7 +433,7 @@ def renderModule (m : HsModule) : String :=
   (HsType.arrow (HsType.con "Int") (HsType.con "Bool")))
   == "foo :: Int -> Bool"
 
--- ── visual: a real codec module ───────────────────────────────────────────────
+-- visual: a real codec module
 
 -- #eval renderModule {
 --   name := "Continuity.Codec.U32LE"
@@ -461,6 +461,5 @@ def renderModule (m : HsModule) : String :=
 --       (HsExpr.app (HsExpr.var "putWord32le") (HsExpr.var "w"))
 --   ]
 -- }
-
 
 end Continuity.Codegen.AST.Haskell

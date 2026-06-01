@@ -2,13 +2,35 @@ import Continuity.Build.Dep
 import Continuity.Build.Vis
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                  // continuity // build // nv
 
-   "The cores. The cores told her when to flee, when to lie still."
-                                                                 — Count Zero
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+      "He remembered a dead bat pressed flat as a dry leaf on
+      runway concrete, wings spread in a final, unintended symmetry
+      — something meant for the dark and the air, flattened onto
+      the hard geometry of the ground. Like a computation mapped
+      to silicon, like a kernel launched across a grid of cores
+      that didn't care what it had been when it was still alive
+      and flying. The architecture was always there, waiting in
+      the chip; you just had to learn to see it in the ruins of
+      whatever had come before."
+
+                                                                   — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Build.Nv
+
+/-
+  native build targets.
+
+  defines `Binary` and `Library` target types for native
+  compilation (`c`, `cuda`). each carries source files,
+  `Dep`endencies, target `archs`, and `Vis`ibility. `Library`
+  adds `exported_headers` for `#include` consumers.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // core // targets
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure Binary where
   name  : String

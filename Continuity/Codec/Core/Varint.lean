@@ -3,26 +3,36 @@ import Std.Tactic.BVDecide
 
 set_option autoImplicit false
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                // continuity // codec // varint
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-!
-  Varint — Protobuf-style variable-length integer encoding.
+      "The architecture of the machine was Byzantine in its economy: every
+      register doubled as a counter, every arithmetic instruction doubled as
+      a branch. The bits moved like water, seven at a time through the
+      serpentine shift paths, the high bit of each byte flagging continuation
+      until the most significant zero terminated the flow. COUNT ZERO
+      INTERRUPT—On receiving an interrupt, decrement the counter to zero.
+      Nothing else happened; the world simply stopped."
 
-  7 bits per byte, MSB = continuation. Max 10 bytes for UInt64.
-  Fully proven roundtrip. Zero sorry.
+                                                                    — Count Zero
 
-  Used by: Protobuf, Git pack format, GRPC framing.
--/
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Codec.Core.Varint
 
 open Continuity.Codec.Core.Box
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                   // serialize
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+/-
+  Varint — Protobuf-style variable-length integer encoding.
+
+  7 bits per byte, MSB = continuation. Max 10 bytes for `UInt64`.
+  Fully proven roundtrip. Zero sorry.
+
+  Used by: `Protobuf`, `Git` pack format, `GRPC` framing.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                    // serialize
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 theorem nat_shr7_lt (n : Nat) (h : n ≥ 128) : n >>> 7 < n := by omega
 
@@ -30,18 +40,18 @@ theorem uint64_shr7_lt (v : UInt64) (h : ¬v < 128) : (v >>> 7).toNat < v.toNat 
   rw [UInt64.toNat_shiftRight]; simp only [UInt64.toNat_ofNat, Nat.reducePow, Nat.reduceMod]
   exact nat_shr7_lt v.toNat (by simp only [UInt64.not_lt] at h; exact h)
 
-/-- serialize varint with accumulator (tail bytes appended to acc). -/
+-- serialize varint with accumulator (tail bytes appended to acc).
 def svc (v : UInt64) (acc : ByteArray) : ByteArray :=
-  if h : v < 128 then acc.push v.toUInt8 -- n.b. warning is elaborator jank...
+  if h : v < 128 then acc.push v.toUInt8
   else svc (v >>> 7) (acc.push ((v &&& (0x7F : UInt64)) ||| (0x80 : UInt64)).toUInt8)
 termination_by v.toNat
 decreasing_by exact uint64_shr7_lt v h
 
 def serializeVarint (v : UInt64) : ByteArray := svc v ByteArray.empty
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                 // accumulator
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                  // accumulator
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private theorem pa (bs : ByteArray) (b : UInt8) : bs.push b = bs ++ {data := #[b]} := by
   apply ByteArray.ext; simp
@@ -59,11 +69,11 @@ decreasing_by all_goals {
   exact nat_shr7_lt _ (by simp only [UInt64.not_lt] at h; exact h)
 }
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                       // parse
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                        // parse
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- parse varint with accumulator, shift, and fuel (max 10 bytes for u64). -/
+-- parse varint with accumulator, shift, and fuel (max 10 bytes for `UInt64`).
 def pvt (bs : ByteArray) (acc : UInt64) (shift : UInt64) (fuel : Nat) : ParseResult UInt64 :=
   match fuel with
   | 0 => .fail
@@ -78,9 +88,9 @@ def pvt (bs : ByteArray) (acc : UInt64) (shift : UInt64) (fuel : Nat) : ParseRes
 
 def parseVarint (bs : ByteArray) : ParseResult UInt64 := pvt bs 0 0 10
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                            // bitvec // lemmas
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                             // bitvec // lemmas
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 set_option maxRecDepth 8192 in
 theorem va (acc v shift : UInt64) (hs : shift < 57) :
@@ -98,11 +108,8 @@ theorem mc (v : UInt64) (h : v < 128) :
 
 theorem ms (v : UInt64) (h : ¬v < 128) :
     (((v &&& 0x7F) ||| 0x80).toUInt8 &&& (0x80 : UInt8) == (0 : UInt8)) = false := by
-    
   simp only [beq_eq_false_iff_ne, ne_eq]; intro h_eq; have := congrArg UInt8.toBitVec h_eq
-  
   simp only [UInt8.toBitVec_ofNat] at this
-    
   revert this; bv_decide
 
 theorem vr (v : UInt64) (h : v < 128) :
@@ -119,10 +126,9 @@ theorem l7 (v : UInt64) :
     UInt8.toBitVec_toUInt64, UInt64.toBitVec_toUInt8]
   bv_decide
 
-
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                        // byte array lemmas
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // byte array lemmas
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def mkB (b : UInt8) : ByteArray := ⟨#[b]⟩
 
@@ -148,10 +154,9 @@ private theorem svc_ge (v : UInt64) (h : ¬v < 128) :
   rw [svc.eq_1]; simp only [h, ↓reduceDIte]
   rw [svc_acc, pa, ByteArray.empty_append]; rfl
 
-
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                         // bounds //  tracking
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // bounds //  tracking
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private theorem a7 (s : UInt64) (h : s < 57) : (s+7).toNat = s.toNat + 7 := by
   rw [UInt64.toNat_add, UInt64.toNat_ofNat]
@@ -177,12 +182,12 @@ private theorem brec (v s : UInt64) (hge : ¬v < 128) (hb : v.toNat < 2^(64-s.to
       Nat.pow_add, pow2_7] at hb
   have := Nat.div_lt_of_lt_mul hb; omega
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                             // main // theorem
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                              // main // theorem
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- Core correctness theorem: pvt inverts svc for any shift/fuel satisfying
-    the invariant shift.toNat + 7*fuel ≥ 64 and fuel ≥ 1. -/
+-- core correctness theorem: `pvt` inverts `svc` for any shift/fuel satisfying
+-- the invariant `shift.toNat + 7*fuel ≥ 64` and `fuel ≥ 1`.
 theorem pvt_svc (v : UInt64) (tail : ByteArray) (acc shift : UInt64) (fuel : Nat)
     (hfuel : fuel ≥ 1) (hinv : shift.toNat + 7 * fuel ≥ 64)
     (hbound : v.toNat < 2^(64-shift.toNat))
@@ -207,9 +212,9 @@ theorem pvt_svc (v : UInt64) (tail : ByteArray) (acc shift : UInt64) (fuel : Nat
   termination_by v.toNat
   decreasing_by exact uint64_shr7_lt v hlt
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                   // roundtrip
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                    // roundtrip
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 theorem roundtrip (v : UInt64) :
     parseVarint (serializeVarint v) = ParseResult.ok v ByteArray.empty := by
@@ -227,11 +232,11 @@ theorem consumption (v : UInt64) (extra : ByteArray) :
         exact UInt64.toNat_lt v)
   simp at this; exact this
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                         // box
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                          // box
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- the varint `Box`: fully proven bidirectional codec. -/
+-- the varint `Box`: fully proven bidirectional codec.
 def varint : Box UInt64 where
   parse := parseVarint
   serialize := serializeVarint

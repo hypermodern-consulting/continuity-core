@@ -2,11 +2,39 @@ import Continuity.Codec.Core.Box
 
 set_option autoImplicit false
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "Silicon's on the way out, Turner. What comes next
+      is smaller and faster, a language of frames
+      multiplexed across a single connection — no more
+      text, no more waves, just binary tables and state
+      machines negotiating compression in the space
+      between SYN and ACK. The old protocol was a
+      conversation; this one is a kind of possession. Same
+      words, different bones, and the ghosts of the old
+      headers live on in a static table, indexed by
+      number, stripped of their names."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 namespace Continuity.Codec.Protocol.Http2
+/-
+  The HTTP/2 Protocol (RFC 7540, RFC 7541).
+
+  Multiplexed binary framing layer with header compression
+  via `HPACK`. Each frame carries a type, stream identifier,
+  and flags; settings are exchanged during connection preface.
+  The `HPACK` static table pre-defines 61 header name/value
+  pairs; integer encoding uses variable-length prefix
+  representation from RFC 7541 §5.1.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // core // frame types
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 open Continuity.Codec.Core.Box
-
--- RFC 7540: HTTP/2, RFC 7541: HPACK
 
 inductive FrameType where
   | data | headers | priority | rstStream | settings
@@ -27,6 +55,10 @@ def FrameType.fromUInt8 : UInt8 → Option FrameType
 theorem frameType_roundtrip (ft : FrameType) : FrameType.fromUInt8 ft.toUInt8 = some ft := by
   cases ft <;> rfl
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                     // parse // frame header
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 structure FrameHeader where
   length : Nat
   frameType : FrameType
@@ -46,7 +78,11 @@ def parseFrameHeader (bs : Bytes) : ParseResult FrameHeader :=
       .ok ⟨len, ft, flags, sid.toUInt32⟩ (bs.extract 9 bs.size)
   else .fail
 
--- HPACK static table (first 15 entries)
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                              // core // hpack
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+-- `HPACK` static table (first 15 entries)
 def hpackStaticTable : List (String × String) :=
   [ (":authority", ""), (":method", "GET"), (":method", "POST")
   , (":path", "/"), (":path", "/index.html"), (":scheme", "http")
@@ -55,7 +91,7 @@ def hpackStaticTable : List (String × String) :=
   , (":status", "404"), (":status", "500"), ("accept-charset", "")
   ]
 
--- HPACK integer encoding (RFC 7541 §5.1)
+-- `HPACK` integer encoding (`rfc 7541` §5.1)
 def hpackEncodeInt (pfx : Nat) (pfxBits : Nat) (n : Nat) : Bytes :=
   let maxPfx := (1 <<< pfxBits) - 1
   if n < maxPfx then ⟨#[(pfx ||| n).toUInt8]⟩
@@ -66,6 +102,10 @@ def hpackEncodeInt (pfx : Nat) (pfxBits : Nat) (n : Nat) : Bytes :=
       else go (remaining / 128) (acc ++ [(remaining % 128 + 128).toUInt8])
     termination_by remaining
     ⟨(first :: go (n - maxPfx) []).toArray⟩
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // core // settings
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 inductive SettingsParam where
   | headerTableSize | enablePush | maxConcurrentStreams

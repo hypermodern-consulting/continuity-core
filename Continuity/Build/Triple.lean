@@ -1,21 +1,35 @@
+set_option autoImplicit false
+
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                 // continuity // build // triple
-                                                                     triple.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  Target triples: arch-vendor-os-abi + cpu/gpu microarchitecture.
+      "They set a slamhound on Turner's trail in New Delhi, slotted it to
+      his pheromones and the color of his hair. It was a good one, a new
+      model from Braun, and it did its work well. It followed him through
+      the heat-haze of Chandni Chowk, through the press of bodies in the
+      Khari Baoli spice market, through the marble corridors of the
+      Maurya Sheraton. It knew its target architecture intimately."
 
-  Standard nomenclature from LLVM/GCC/Rust. Microarchitecture fields
-  from the Nix target model. These matter for `-march`/`-mtune` (CPU)
-  and `-arch=sm_XX` (GPU).
+                                                                    — Count Zero
 
-  This is pure data — no proofs, no IO. Cross-compilation detection
-  happens in the build system layer, not here.
--/
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Build
 
+/-
+  Target Triples.
+
+  `arch`-`vendor`-`os`-`abi` with `cpu`/`gpu` microarchitecture
+  fields. Standard `LLVM`/`Rust` triple nomenclature. The `cpu`
+  and `gpu` fields select `-march`/`-mtune` and `-arch=sm_XX`
+  respectively — they are not part of the triple string itself.
+
+  This is pure data: no proofs, no `IO`. Cross-compilation detection
+  lives in the build system layer, not here.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // core // components
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 inductive Arch where
   | x86_64 | aarch64 | riscv64 | wasm32 | armv7
@@ -35,29 +49,20 @@ inductive ABI where
 
 inductive Cpu where
   | generic | native
-  -- x86_64
   | x86_64_v2 | x86_64_v3 | x86_64_v4
   | znver3 | znver4 | znver5
   | sapphirerapids | alderlake
-  -- aarch64 datacenter
   | neoverse_v2 | neoverse_n2
-  -- aarch64 embedded
   | cortex_a78ae | cortex_a78c
-  -- aarch64 consumer
   | apple_m1 | apple_m2 | apple_m3 | apple_m4
   deriving Repr, DecidableEq, Inhabited
 
 inductive Gpu where
   | none
-  -- Ampere
   | sm_80 | sm_86
-  -- Ada Lovelace
   | sm_89
-  -- Hopper
   | sm_90 | sm_90a
-  -- Orin
   | sm_87
-  -- Blackwell
   | sm_100 | sm_100a | sm_120
   deriving Repr, DecidableEq, Inhabited
 
@@ -70,10 +75,9 @@ structure Triple where
   gpu    : Gpu
   deriving Repr, DecidableEq, Inhabited
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                   // rendering
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                               // rendering
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def Arch.render : Arch → String
   | .x86_64  => "x86_64"  | .aarch64 => "aarch64"
@@ -113,17 +117,15 @@ def Gpu.render : Gpu → String
   | .sm_90a => "sm_90a" | .sm_100 => "sm_100"
   | .sm_100a => "sm_100a" | .sm_120 => "sm_120"
 
-/-- Render to canonical LLVM triple string (cpu/gpu go to flags, not the triple). -/
 def Triple.render (t : Triple) : String :=
   let base := s!"{t.arch.render}-{t.vendor.render}-{t.os.render}"
   match t.abi with
   | ABI.none => base
   | abi      => s!"{base}-{abi.render}"
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // common triples
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // common triples
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def Triple.x86_64_linux_gnu : Triple :=
   ⟨.x86_64, .unknown, .linux, .gnu, .generic, .none⟩
@@ -140,7 +142,6 @@ def Triple.aarch64_apple_darwin : Triple :=
 def Triple.wasm32_wasi : Triple :=
   ⟨.wasm32, .unknown, .wasi, .none, .generic, .none⟩
 
--- NVIDIA targets
 def Triple.grace_hopper : Triple :=
   ⟨.aarch64, .nvidia, .linux, .gnu, .neoverse_v2, .sm_90a⟩
 
@@ -150,10 +151,9 @@ def Triple.jetson_orin : Triple :=
 def Triple.dgx_blackwell : Triple :=
   ⟨.aarch64, .nvidia, .linux, .gnu, .neoverse_v2, .sm_100a⟩
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                       // tests
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                   // tests
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 #guard Triple.x86_64_linux_gnu.render == "x86_64-unknown-linux-gnu"
 #guard Triple.aarch64_apple_darwin.render == "aarch64-apple-darwin"
@@ -162,9 +162,10 @@ def Triple.dgx_blackwell : Triple :=
 #guard Triple.grace_hopper.gpu.render == "sm_90a"
 #guard Triple.grace_hopper.cpu.render == "neoverse-v2"
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // codegen // names
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-
--- constructor names for codegen (match Dhall union tags)
 def Arch.name : Arch → String
   | .x86_64 => "x86_64" | .aarch64 => "aarch64"
   | .riscv64 => "riscv64" | .wasm32 => "wasm32" | .armv7 => "armv7"

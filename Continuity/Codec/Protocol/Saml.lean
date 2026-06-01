@@ -3,14 +3,38 @@ import Continuity.Codec.Core.Scanner
 
 set_option autoImplicit false
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "It was such an easy thing, death. He saw that now:
+      it just happened. You didn't have to assert anything,
+      didn't need to sign your name against some remote
+      authority or wrap your identity in a payload that
+      someone else would have to verify. You just stopped.
+      There was no scanner waiting to extract the claim
+      from your final bytes, no wrapping attack to prevent.
+      The whole thing was a function whose only side effect
+      was its own absence."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
 namespace Continuity.Codec.Protocol.Saml
+
+/-
+  `SAML` assertion scanning with wrapping attack prevention.
+
+  `findElement` locates named elements in XML without an XML
+  parser, bounding search in O(n). `verify` is the only path
+  from `UnverifiedAssertion` to `VerifiedAssertion`, ensuring
+  identity claims can only be extracted from signed bytes.
+-/
 
 open Continuity.Codec.Core.Box Continuity.Codec.Core.Scanner
 
-/-!
-  SAML Assertion Scanner — wrapping attack prevention by construction.
-  Identity claims extracted ONLY from signed bytes.
--/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                       // core // scanning
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def findElement (qname : String) (bs : Bytes) : Option (Bytes × Bytes) :=
   let openPfx := ("<" ++ qname).toUTF8
@@ -40,6 +64,10 @@ def findElement (qname : String) (bs : Bytes) : Option (Bytes × Bytes) :=
       | none => none
   go 0 bs.size
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                    // core // assertion
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 structure SignedPayload where
   signedBytes : Bytes
   signatureValue : Bytes
@@ -55,7 +83,11 @@ structure VerifiedAssertion where
   nameId : String
   conditions : Option Bytes
 
-/-- Only way to get a VerifiedAssertion: pass signature verification. -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                 // core // verification
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+-- only way to get a `VerifiedAssertion`: pass signature verification
 def verify (ua : UnverifiedAssertion)
     (verifyFn : Bytes → Bytes → Bool) : Option VerifiedAssertion :=
   if verifyFn ua.signedPayload.signedBytes ua.signedPayload.signatureValue then

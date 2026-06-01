@@ -4,29 +4,38 @@ import Continuity.Codegen.AST.Haskell.Render
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                               // continuity // emit // haskell
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  Builder DSL — monadic helpers for ergonomic Haskell AST construction.
+      "Silicon's on the way out, Turner." The new chips were bio-synthetic,
+      grown in vats from tailored proteins. They didn't etch circuits —
+      they wove them, layer by layer, following templates no human mind
+      could hold entire. You wrote the builder once, a monadic accumulator
+      that knew the shape of the thing, and then you let it run. The
+      do-block was the loom. The declarations were the yarn.
 
-  Three builder monads:
-    DoM   — accumulates do-notation statements
-    DeclM — accumulates top-level declarations
-    FieldM — accumulates record fields (data decl or record construction)
+                                                                    — Count Zero
 
-  Plus short aliases for the expression constructors you type a hundred
-  times when writing codegen: var, con, app, apps, infix_, litInt, etc.
--/
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Codegen.AST.Haskell
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                     // expression // shortcuts
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+/-
+  builder DSL — monadic helpers for ergonomic haskell AST construction.
 
-/-! these save keystrokes in codegen call sites. every one is a trivial
-    wrapper — the full constructors are always available if you prefer. -/
+  three builder monads:
+    `DoM`   — accumulates do-notation statements
+    `DeclM` — accumulates top-level declarations
+    `FieldM` — accumulates record fields (data decl or record construction)
+
+  plus short aliases for the expression constructors you type a hundred
+  times when writing codegen: `var`, `con`, `app`, `apps`, `infix_`, `litInt`, etc.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                      // expression // shortcuts
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+-- these save keystrokes in codegen call sites. every one is a trivial
+-- wrapper — the full constructors are always available if you prefer.
 
 namespace E
 
@@ -58,7 +67,7 @@ def negate (e : HsExpr) : HsExpr := HsExpr.negate e
 
 end E
 
--- ── pattern shortcuts ─────────────────────────────────────────────────────────
+-- pattern shortcuts
 
 namespace P
 
@@ -71,7 +80,7 @@ def bang (p : HsPat) : HsPat := HsPat.bang p
 
 end P
 
--- ── type shortcuts ────────────────────────────────────────────────────────────
+-- type shortcuts
 
 namespace T
 
@@ -87,7 +96,7 @@ def maybe (a : HsType) : HsType := HsType.maybe a
 def unit : HsType := HsType.unit
 def promotedList (ts : List HsType) : HsType := HsType.promotedList ts
 
-/-- `a -> b -> c` — chains of arrows -/
+-- ``a -> b -> c`` — chains of arrows
 def arrows (ts : List HsType) : HsType :=
   match ts with
   | []          => HsType.unit
@@ -96,52 +105,51 @@ def arrows (ts : List HsType) : HsType :=
 
 end T
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                               // do-block builder
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                              // do-block builder
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
-/-- Accumulates do-notation statements. Use with `buildDo do ...` -/
+-- accumulates do-notation statements. use with `buildDo` do ...
 abbrev DoM := StateM (List DoStmt)
 
-/-- `name <- expr` -/
+-- `name <- expr`
 def bind (name : String) (expr : HsExpr) : DoM Unit :=
   modify fun stmts => stmts ++ [DoStmt.bind (HsPat.var name) expr]
 
-/-- `pat <- expr` — bind with an arbitrary pattern -/
+-- `pat <- expr` — bind with an arbitrary pattern
 def bindPat (pat : HsPat) (expr : HsExpr) : DoM Unit :=
   modify fun stmts => stmts ++ [DoStmt.bind pat expr]
 
-/-- `_ <- expr` — bind and discard -/
+-- `_ <- expr` — bind and discard
 def bind_ (expr : HsExpr) : DoM Unit :=
   modify fun stmts => stmts ++ [DoStmt.bind HsPat.wild expr]
 
-/-- `let name = expr` -/
+-- `let name = expr`
 def letBind (name : String) (expr : HsExpr) : DoM Unit :=
   modify fun stmts => stmts ++ [DoStmt.letStmt (HsPat.var name) expr]
 
-/-- `let pat = expr` — let with an arbitrary pattern -/
+-- `let pat = expr` — let with an arbitrary pattern
 def letPat (pat : HsPat) (expr : HsExpr) : DoM Unit :=
   modify fun stmts => stmts ++ [DoStmt.letStmt pat expr]
 
-/-- bare expression (usually the last statement, or a void action) -/
+-- bare expression (usually the last statement, or a void action)
 def stmt (expr : HsExpr) : DoM Unit :=
   modify fun stmts => stmts ++ [DoStmt.expr expr]
 
-/-- `pure expr` — idiomatic last statement -/
+-- `pure expr` — idiomatic last statement
 def ret (expr : HsExpr) : DoM Unit :=
   stmt (E.pure_ expr)
 
-/-- Run a do-block builder, producing a do expression -/
+-- run a do-block builder, producing a do expression
 def buildDo (m : DoM Unit) : HsExpr :=
   let (_, stmts) := m.run []
   HsExpr.do_ stmts
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                          // declaration builder
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // declaration builder
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- Accumulates top-level declarations. Use with `buildDecls do ...` -/
+-- accumulates top-level declarations. use with `buildDecls` do ...
 abbrev DeclM := StateM (List HsDecl)
 
 namespace DeclM
@@ -164,11 +172,11 @@ def comment (text : String) : DeclM Unit :=
 def typeSig (name : String) (ty : HsType) : DeclM Unit :=
   modify fun ds => ds ++ [HsDecl.typeSig name ty]
 
-/-- simple function: one clause, no guards, no where -/
+-- simple function: one clause, no guards, no where
 def fun_ (name : String) (pats : List HsPat) (body : HsExpr) : DeclM Unit :=
   modify fun ds => ds ++ [HsDecl.simpleFun name pats body]
 
-/-- type signature + function definition together -/
+-- type signature + function definition together
 def sigFun (name : String) (ty : HsType) (pats : List HsPat) (body : HsExpr) : DeclM Unit :=
   modify fun ds => ds ++ [
     HsDecl.typeSig name ty,
@@ -188,92 +196,42 @@ def typeAlias (name : String) (params : List String) (body : HsType) : DeclM Uni
 
 end DeclM
 
-/-- Run a declaration builder -/
+-- run a declaration builder
 def buildDecls (m : DeclM Unit) : List HsDecl :=
   let (_, ds) := m.run []
   ds
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                            // module builder
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                // module builder
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- Build a complete module from a declaration builder -/
+-- build a complete module from a declaration builder
 def buildModule (name : String) (exports : Option (List String))
     (m : DeclM Unit) : HsModule :=
   { name := name
   , exports := exports
   , decls := buildDecls m }
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                              // record fields
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                  // record fields
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- Accumulates record fields for data declarations or record expressions -/
+-- accumulates record fields for data declarations or record expressions
 abbrev FieldM := StateM (List (String × HsType))
 
-/-- Add a field to a record type being built -/
+-- add a field to a record type being built
 def recordField (name : String) (ty : HsType) : FieldM Unit :=
   modify fun fs => fs ++ [(name, ty)]
 
-/-- Run a field builder, producing a record data constructor -/
+-- run a field builder, producing a record data constructor
 def buildRecordCon (name : String) (m : FieldM Unit) : DataCon :=
   let (_, fs) := m.run []
   DataCon.record name fs
 
-
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                       // tests
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                        // tests
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 -- TODO[b7r6]: !! write real tests !!
-
--- ── do-block builder ──────────────────────────────────────────────────────────
-
--- #eval renderExpr (buildDo do
---   bind "len"     <| E.var "getWord64le"
---   bind "content" <| E.apps (E.var "getByteString") [E.fromIntegral (E.var "len")]
---   letBind "padLen" <|
---     E.infix_ "`mod`"
---       (E.infix_ "-" (E.litInt 8)
---         (E.infix_ "`mod`" (E.var "len") (E.litInt 8)))
---       (E.litInt 8)
---   bind_ <| E.apps (E.var "getByteString") [E.fromIntegral (E.var "padLen")]
---   ret <| E.apps (E.con "NixString") [E.var "content"])
-
--- ── full module builder ───────────────────────────────────────────────────────
-
--- #eval renderModule (buildModule
---   "Continuity.Codec.NixString"
---   (Option.some ["NixString(..)", "parseNixString", "serializeNixString"])
---   do
---     DeclM.pragma "LANGUAGE" "StrictData"
---     DeclM.blank
---     DeclM.import_ "Data.ByteString" ["ByteString"]
---     DeclM.importQ "Data.ByteString" "BS"
---     DeclM.import_ "Data.Word" ["Word64"]
---     DeclM.import_ "Data.Binary.Get" ["Get", "getWord64le", "getByteString"]
---     DeclM.import_ "Data.Binary.Put" ["Put", "putWord64le", "putByteString"]
---     DeclM.blank
---     DeclM.data_ "NixString" []
---       [buildRecordCon "NixString" do
---         recordField "nixStringContent" (T.con "ByteString")]
---       ["Show", "Eq"]
---     DeclM.blank
---     DeclM.sigFun "parseNixString"
---       (T.app (T.con "Get") (T.con "NixString"))
---       []
---       (buildDo do
---         bind "len" <| E.var "getWord64le"
---         bind "content" <|
---           E.apps (E.var "getByteString") [E.fromIntegral (E.var "len")]
---         letBind "padLen" <|
---           E.infix_ "`mod`"
---             (E.infix_ "-" (E.litInt 8)
---               (E.infix_ "`mod`" (E.var "len") (E.litInt 8)))
---             (E.litInt 8)
---         bind_ <|
---           E.apps (E.var "getByteString") [E.fromIntegral (E.var "padLen")]
---         ret <| E.apps (E.con "NixString") [E.var "content"]))
-
 
 end Continuity.Codegen.AST.Haskell

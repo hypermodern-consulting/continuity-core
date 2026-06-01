@@ -4,23 +4,33 @@ import Continuity.Codegen.AST.Starlark.Ast
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                            // continuity // render // starlark
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  Starlark renderer — the ONLY place .bzl / BUCK text is assembled.
+      "Shee-it, I figured it was a big one, but I guess it's gonna be a rough
+      one, too." Bobby ran a thumb along the edge of the stack of printout.
+      "See, the funny thing is, whoever set this up, they built it to last.
+      Every piece fits. Every joint is clean. You don't get that kind of
+      work unless somebody's planning to be running code through it for a
+      long, long time. And they built it so the output — what comes out the
+      other end — is exactly what the next stage needs. No gaps. No seams."
+
+                                                                     — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
+namespace Continuity.Codegen.AST.Starlark
+
+/-
+  Starlark renderer — the ONLY place `.bzl` / `BUCK` text is assembled.
 
   One entry point: `renderBzlFile`. Everything else is a helper.
   Generated files should be parseable by `buildifier` without changes.
 -/
 
-namespace Continuity.Codegen.AST.Starlark
-
 open Continuity.Build
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                     // helpers
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                      // helpers
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def pad (n : Nat) : String := "".pushn ' ' n
 
@@ -36,14 +46,14 @@ private def escapeStr (s : String) : String :=
 
 private def renderStrLit (s : String) : String := s!"\"{escapeStr s}\""
 
-/-- Render a list of strings as a Starlark list literal. -/
+-- render a list of strings as a starlark list literal.
 private def renderStrList (items : List String) : String :=
   if items.isEmpty then "[]"
   else
     let inner := String.intercalate ", " (items.map renderStrLit)
     s!"[{inner}]"
 
-/-- Render a list of strings as a multi-line Starlark list literal. -/
+-- render a list of strings as a multi-line starlark list literal.
 private def renderStrListMulti (indent : Nat) (items : List String) : String :=
   if items.isEmpty then "[]"
   else if items.length ≤ 3 then renderStrList items
@@ -51,19 +61,17 @@ private def renderStrListMulti (indent : Nat) (items : List String) : String :=
     let lines := items.map fun s => s!"{pad (indent + 4)}{renderStrLit s},"
     s!"[\n{String.intercalate "\n" lines}\n{pad indent}]"
 
-
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                          // load // statements
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                            // load // builders
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def renderLoad (l : Load) : String :=
   let syms := String.intercalate ", " (l.symbols.map renderStrLit)
   s!"load({renderStrLit l.bzl}, {syms})"
 
-
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                   // providers
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                  // providers
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def renderProviderField : ProviderField → String
   | .typed name type dflt =>
@@ -77,10 +85,9 @@ private def renderProvider (p : ProviderDef) : String :=
   let fields := String.intercalate ", " (p.fields.map renderProviderField)
   s!"{p.name} = provider(fields = [{fields}])"
 
-
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                               // attr // types
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                              // attr // helpers
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def renderAttrType : AttrType → String
   | .string (some d)   => s!"attrs.string(default = {renderStrLit d})"
@@ -113,9 +120,9 @@ private def renderAttrType : AttrType → String
 private def renderAttr (a : Attr) : String :=
   s!"\"{a.name}\": {renderAttrType a.type}"
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                         // helper // functions
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                        // helper // functions
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def renderHelperFn (h : HelperFn) : String :=
   let retAnnotation := match h.returnType with
@@ -125,12 +132,12 @@ private def renderHelperFn (h : HelperFn) : String :=
   let params := String.intercalate ", " h.params
   s!"def {h.name}({params}){retAnnotation}:\n{h.body}"
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                       // rules
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                       // rules
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
--- TODO[b7r6]: !! clean up this monstronsity !!
+-- TODO[b7r6]: !! clean up this `renderRule` — the implFn and pubName extraction
+-- is fragile. consider factoring the name munging into `BzlRule` or a helper !!
 
 private def renderRule (r : BzlRule) : String :=
   let implFn := s!"def {r.impl.name}(ctx: AnalysisContext) -> list[Provider]:\n{r.impl.body}"
@@ -138,18 +145,17 @@ private def renderRule (r : BzlRule) : String :=
   let attrBlock := String.intercalate "\n" attrLines
   let implKw := if r.impl.is_toolchain then "True" else "False"
 
-  -- The public rule name: strip leading underscore and _impl suffix
+  -- the public rule name: strip leading underscore and `_impl` suffix
   let pubName := r.impl.name.dropPrefix "_" |>.dropPrefix "_impl"
   let doc := if r.impl.doc.isEmpty then "" else s!"\n    doc = \"\"\"{r.impl.doc}\"\"\","
 
   s!"{implFn}\n\n{pubName} = rule(\n    impl = {r.impl.name},{doc}\n    is_toolchain_rule = {implKw},\n    attrs = \{\n{attrBlock}\n    },\n)"
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                               // top // level
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                   // top-level
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
-/-- Render a complete BzlFile to Starlark text. -/
+-- render a complete `BzlFile` to starlark text.
 def renderBzlFile (f : BzlFile) : String :=
   let sections : List String := List.filter (· ≠ "") [
     -- header comment
@@ -158,18 +164,18 @@ def renderBzlFile (f : BzlFile) : String :=
     -- load statements
     (if f.loads.isEmpty then ""
      else String.intercalate "\n" (f.loads.map renderLoad)),
-     
+      
     -- globals
     f.globals,
     
     -- providers
     (if f.providers.isEmpty then ""
      else String.intercalate "\n" (f.providers.map renderProvider)),
-     
+      
     -- helpers
     (if f.helpers.isEmpty then ""
      else String.intercalate "\n\n" (f.helpers.map renderHelperFn)),
-     
+      
     -- rules
     (if f.rules.isEmpty then ""
      else String.intercalate "\n\n\n" (f.rules.map renderRule))
@@ -177,20 +183,19 @@ def renderBzlFile (f : BzlFile) : String :=
   
   String.intercalate "\n\n" sections ++ "\n"
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                        // BUCK
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                        // BUCK
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
-/-- a toolchain instantiation in a BUCK file. -/
+-- a toolchain instantiation in a `BUCK` file.
 structure ToolchainCall where
-  ruleFunc   : String          -- e.g. "system_cxx_toolchain"
-  name       : String          -- e.g. "cxx"
-  kwargs     : List (String × String)  -- key-value pairs (already rendered)
+  ruleFunc   : String                      -- e.g. `"system_cxx_toolchain"`
+  name       : String                      -- e.g. `"cxx"`
+  kwargs     : List (String × String)      -- key-value pairs (already rendered)
   visibility : List String := ["PUBLIC"]
   deriving Repr, Inhabited
 
-/-- render a single toolchain call in a BUCK file. -/
+-- render a single toolchain call in a `BUCK` file.
 def renderToolchainCall (t : ToolchainCall) : String :=
   let vis := renderStrList t.visibility
   let kwargLines := t.kwargs.map fun (k, v) => s!"    {k} = {v},"
@@ -201,14 +206,14 @@ def renderToolchainCall (t : ToolchainCall) : String :=
     
   s!"{t.ruleFunc}(\n{String.intercalate "\n" allLines}\n)"
 
-/-- a complete BUCK file for toolchains. -/
+-- a complete `BUCK` file for toolchains.
 structure BuckFile where
   header  : String := ""
   loads   : List Load := []
   calls   : List ToolchainCall := []
   deriving Repr, Inhabited
 
-/-- render a toolchains/BUCK file. -/
+-- render a toolchains/BUCK file.
 def renderBuckFile (b : BuckFile) : String :=
   let sections : List String := List.filter (· ≠ "") [
     b.header,
@@ -220,16 +225,13 @@ def renderBuckFile (b : BuckFile) : String :=
   
   String.intercalate "\n\n" sections ++ "\n"
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                             // AST // render
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                               // ast // render
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
-/-! Render SFile → String. Builder → AST → Render. -/
+-- render `SFile` to string. Builder → AST → render.
 
 mutual
-
--- TODO[b7r6]: TODO[b7r6]: !! split out functions from this wall of shame !!
 
 partial def renderSExpr : SExpr → String
   | .str s        => renderStrLit s
@@ -276,8 +278,6 @@ partial def renderSExpr : SExpr → String
     
   | .raw text          => text
 
--- TODO[b7r6]: TODO[b7r6]: !! split out functions from this wall of shame !!
-
 partial def renderSStmt (indent : Nat) : SStmt → String
   | .assign target value =>
     s!"{pad indent}{target} = {renderSExpr value}"
@@ -317,8 +317,6 @@ partial def renderSStmt (indent : Nat) : SStmt → String
     s!"{pad indent}{text}"
 
 end
-
--- TODO[b7r6]: TODO[b7r6]: !! split out functions from this wall of shame !!
 
 private def renderSParam (p : SParam) : String :=
   let typeStr := match p.type with
@@ -370,7 +368,7 @@ private def renderSTop : STop → String
     
   | .blank => ""
 
-/-- Render a complete .bzl file from AST. -/
+-- render a complete `.bzl` file from AST.
 def renderSFile (f : SFile) : String :=
   let headerStr := if f.header.isEmpty then [] else [f.header]
   let itemStrs := f.items.map renderSTop

@@ -3,9 +3,42 @@ import Continuity.Codec.Core.Scanner
 
 set_option autoImplicit false
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "The mindless glide of the thing, scanning the dark for
+      patterns it could not name, consuming symbols without ever
+      knowing what they stood for. A null was just as real as a
+      number and neither meant a thing to the machine. It would
+      parse a cathedral of nested structures with the same flat
+      indifference it gave a single boolean flag. The scanner
+      advanced, byte by byte, past brackets and colons and commas
+      — mindless glide, tireless, asking nothing of what it read
+      and remembering even less. At the end of the stream it
+      stopped, having built a shape in memory that precisely
+      mirrored a shape in another machine's intent, and neither
+      one had understood a single line."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
 namespace Continuity.Codec.Protocol.Json
 
+/-
+  A recursive-descent `JSON` parser over raw bytes.
+
+  Implements `rfc 8259`-conformant parsing via position-based
+  scanning. no intermediate tokenization — the scanner feeds
+  directly from `Bytes` into the `Value` algebra. `null`, `bool`,
+  `number`, `str`, `array`, and `object` are mutually recursive
+  in the `parseValue` / `where`-block structure.
+-/
+
 open Continuity.Codec.Core.Box
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // algebra // value
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 inductive Value where
   | null
@@ -27,10 +60,18 @@ def Value.field (v : Value) (name : String) : Option Value :=
   | .object fields => fields.find? (fun (k, _) => k == name) |>.map Prod.snd
   | _ => none
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // scan // classify
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 def isWhitespace (c : UInt8) : Bool := c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D
 def isDigit (c : UInt8) : Bool := c >= 0x30 && c <= 0x39
 
--- Parse JSON using position-based scanning (partial for mutual recursion)
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                            // scan // parse
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+-- parse `JSON` using position-based scanning (partial for mutual recursion)
 partial def parseValue (bs : Bytes) (pos : Nat) : Option (Value × Nat) :=
   let pos := skipWS bs pos
   if h : pos < bs.size then

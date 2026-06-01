@@ -1,25 +1,38 @@
+set_option autoImplicit false
+
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                               // continuity // build // bzlfile
-                                                                   bzlfile.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  BzlFile — Buck2 rule definition types.
+      "Bobby Newmark, aka Count Zero, but it was already
+      over — the name, the identity, the carefully
+      constructed facade of rules that determine who you
+      are and what you are permitted to build. Rules are
+      not constraints, the Finn had told him once. Rules
+      are the grammar of making. Without them, you do not
+      have a language. You have noise. Every artifact
+      worth its provenance was built inside a cage of
+      formal expectations, and the art lay in knowing
+      which bars to bend and which to leave in place."
 
-  These describe the *shape* of a .bzl rule file: what attrs it has,
-  what providers it declares, what its implementation body is. The
-  actual rendering to Starlark text is done in Dhall (to-starlark.dhall).
+                                                                    — Count Zero
 
-  Types + terms in one file. The terms here are validation and
-  structural constraint functions, not Starlark emission.
--/
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Build
 
+/-
+  `BzlFile` — `Buck2` rule definition types.
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // attr types
-   ════════════════════════════════════════════════════════════════════════════════ -/
+  These describe the *shape* of a `.bzl` rule file: what attrs it has,
+  what providers it declares, what its implementation body is. The
+  actual rendering to `Starlark` text is done in `Dhall` (`to-starlark.dhall`).
+
+  Types + terms in one file. The terms here are validation and
+  structural constraint functions, not `Starlark` emission.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                // attr types
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 inductive AttrType where
   | string (dflt : Option String)
@@ -47,10 +60,9 @@ structure Attr where
   doc  : String := ""
   deriving Repr, Inhabited
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                            // provider types
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                             // provider types
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 inductive ProviderField where
   | typed (name : String) (type : String) (dflt : Option String)
@@ -62,10 +74,9 @@ structure ProviderDef where
   fields : List ProviderField
   deriving Repr, Inhabited
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                          // rule + file types
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // rule + file types
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure Load where
   bzl     : String
@@ -82,7 +93,7 @@ structure HelperFn where
 structure RuleImpl where
   name         : String
   doc          : String := ""
-  body         : String    -- raw Starlark implementation
+  body         : String    -- raw `Starlark` implementation
   is_toolchain : Bool := false
   deriving Repr, Inhabited
 
@@ -100,10 +111,9 @@ structure BzlFile where
   rules     : List BzlRule := []
   deriving Repr, Inhabited
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // constructors
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                               // constructors
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def Attr.string_ (name : String) (dflt : Option String := Option.none) : Attr :=
   ⟨name, AttrType.string dflt, ""⟩
@@ -113,6 +123,5 @@ def Attr.source_ (name : String) : Attr := ⟨name, AttrType.source, ""⟩
 def Attr.sourceList_ (name : String) : Attr := ⟨name, AttrType.sourceList, ""⟩
 def Attr.dep_ (name : String) : Attr := ⟨name, AttrType.dep, ""⟩
 def Attr.depList_ (name : String) : Attr := ⟨name, AttrType.depList, ""⟩
-
 
 end Continuity.Build

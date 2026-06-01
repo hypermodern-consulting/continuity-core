@@ -3,9 +3,38 @@ import Continuity.Codec.Core.Bytes
 
 set_option autoImplicit false
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "The knob was ridiculous, handmade, baleful; it was there to welcome
+      him back to Mexico. But the real interface was elsewhere — in the
+      word-sized slots the hardware offered up, thirty-two bytes apiece,
+      chained into attestation frames with a selector leading the pack.
+      Four bytes for dispatch, then the content hash, then the signer
+      identity, then timestamps bracketing the valid window, and finally
+      the vouch chain root anchoring the whole assembly to the state tree."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
 namespace Continuity.Codec.Protocol.EVM
 
 open Continuity.Codec.Core.Box Continuity.Codec.Core.Bytes
+
+/-
+  EVM protocol codecs — `AttestCalldata` serialization for on-chain attestations.
+
+  Encodes an attestation as a packed ABI frame: 4-byte selector followed
+  by five 32-byte `Word` fields. Uses the `Box` machinery for bidirectional
+  codecs with proved roundtrip.
+
+  Layout: `selector (4B) | contentHash (32B) | signerIdentity (32B) |
+  issuedAt (32B) | expiresAt (32B) | vouchChainRoot (32B)`.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                    // primitives
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 abbrev Word := FixedBytes 32
 def word : Box Word := fixedBytes 32
@@ -15,6 +44,10 @@ def selector : Box Selector := fixedBytes 4
 
 def encodeUint64 (v : UInt64) : ByteArray :=
   ByteArray.mk (Array.replicate 24 0) ++ u64le.serialize v
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // attest //  calldata
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure AttestCalldata where
   sel : Selector
@@ -28,9 +61,11 @@ private abbrev Packed := Selector × (Word × (Word × (Word × (Word × Word)))
 
 private def packedBox : Box Packed := seq selector (seq word (seq word (seq word (seq word word))))
 
+-- flatten `AttestCalldata` to nested tuple for `Box` composition
 private def toPacked (a : AttestCalldata) : Packed :=
   (a.sel, (a.contentHash, (a.signerIdentity, (a.issuedAt, (a.expiresAt, a.vouchChainRoot)))))
 
+-- reconstruct `AttestCalldata` from nested tuple
 private def fromPacked (p : Packed) : AttestCalldata :=
   let (s, (ch, (si, (ia, (ea, vcr))))) := p
   ⟨s, ch, si, ia, ea, vcr⟩
@@ -39,6 +74,10 @@ def attestCalldata : Box AttestCalldata :=
   isoBox packedBox fromPacked toPacked
     (fun _ => rfl)
     (fun ⟨_, _, _, _, _, _⟩ => rfl)
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                   // constants
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def ATTEST_CALLDATA_SIZE : Nat := 4 + 5 * 32
 

@@ -1,18 +1,33 @@
 import Continuity.Codec.Core.Box
 import Continuity.Codec.Core.Bytes
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                              // continuity // codec // scanner
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+set_option autoImplicit false
 
-/-!
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "They moved with the relaxed precision of good technicians,
+      scanning the dataflow for the characteristic signatures they
+      had been trained to recognize. A ripple in the lattice, a
+      brief hesitation in the pulse-train — these were the tokens
+      of intrusion, and they had learned to read them as surely as
+      a tracker reads the shape of a broken twig. The system was
+      vast, but it was legible. Everything that moved through it
+      left a trace, and every trace had a shape. You just had to
+      know what you were looking for."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
+namespace Continuity.Codec.Core.Scanner
+/-
   Scanner — delimiter-based scanning for text/line protocols.
 
-  Scanner sits between Box and Parser in the power hierarchy:
+  Scanner sits between `Box` and `Parser` in the power hierarchy:
 
-    Box     — LL(0) + dep, bidirectional, for binary formats
-    Scanner — LL(0) + delimiter scan, one-way, for text/line protocols
-    Parser  — LL(k), token-based, for structured text
+    `Box`     — LL(0) + dep, bidirectional, for binary formats
+    `Scanner` — LL(0) + delimiter scan, one-way, for text/line protocols
+    `Parser`  — LL(k), token-based, for structured text
 
   Key insight: text protocols use delimiters (CRLF, `:`, `,`) rather than
   length prefixes. Scanner provides verified delimiter scanning with a
@@ -23,22 +38,20 @@ import Continuity.Codec.Core.Bytes
   Use cases: HTTP/1.1 headers, PEM files, CSV, SMTP/FTP, URI parsing.
 -/
 
-namespace Continuity.Codec.Core.Scanner
-
 open Continuity.Codec.Core.Box
 open Continuity.Codec.Core.Bytes
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                              // scan // result
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                               // scan result
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- Result of scanning bytes for a delimiter. -/
+-- result of scanning bytes for a delimiter.
 inductive ScanResult (α : Type) where
-  /-- found match: content + remaining bytes after delimiter -/
+  -- found match: content + remaining bytes after delimiter
   | found : α → Bytes → ScanResult α
-  /-- delimiter not found in input -/
+  -- delimiter not found in input
   | notFound : ScanResult α
-  /-- need more bytes (for streaming protocols) -/
+  -- need more bytes (for streaming protocols)
   | incomplete : Nat → ScanResult α
   deriving Inhabited
 
@@ -71,31 +84,28 @@ def toOption {α : Type} : ScanResult α → Option (α × Bytes)
 
 end ScanResult
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                    // scanner
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                   // scanner
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
-/-- A Scanner finds delimited content in a byte stream.
-
-    Unlike Box: one-directional (parse only), scans for delimiters rather
-    than knowing length upfront.
-
-    The `consumption` field is a documentation obligation — concrete
-    scanners carry tight theorems proven separately (see
-    `scanUntilByte_consumption` below). -/
+-- a scanner finds delimited content in a byte stream.
+-- unlike `Box`: one-directional (parse only), scans for delimiters rather
+-- than knowing length upfront.
+-- the `consumption` field is a documentation obligation — concrete
+-- scanners carry tight theorems proven separately (see
+-- `scanUntilByte_consumption` below).
 structure Scanner (α : Type) where
   scan : Bytes → ScanResult α
   consumption : ∀ (content rest : Bytes),
     (scan (content ++ rest)).toOption.map (·.2) = Option.some rest → True
   deriving Inhabited
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                  // byte-finding // primitives
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                   // byte-finding primitives
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- Find index of first occurrence of a byte.
-    Explicit fuel-based recursion for proof induction on content.size. -/
+-- find index of first occurrence of a byte.
+-- explicit fuel-based recursion for proof induction on content.size.
 def findByte (needle : UInt8) (haystack : Bytes) : Option Nat :=
   let rec go (i fuel : Nat) : Option Nat :=
     match fuel with
@@ -106,7 +116,7 @@ def findByte (needle : UInt8) (haystack : Bytes) : Option Nat :=
       else go (i + 1) fuel'
   go 0 haystack.size
 
-/-- Find index of first occurrence of a byte sequence. -/
+-- find index of first occurrence of a byte sequence.
 def findBytes (needle : Bytes) (haystack : Bytes) : Option Nat :=
   if needle.size == 0 then Option.some 0
   else if haystack.size < needle.size then Option.none
@@ -121,14 +131,13 @@ def findBytes (needle : Bytes) (haystack : Bytes) : Option Nat :=
         else go (i + 1) fuel'
     go 0 limit
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // findByte theorems
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                          // findByte theorems
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
-/-! these lemmas establish that findByte correctly locates the first
-    occurrence of a delimiter. the key theorem `findByte_append_delim`
-    is the foundation for `scanUntilByte_consumption`. -/
+-- these lemmas establish that `findByte` correctly locates the first
+-- occurrence of a delimiter. the key theorem `findByte_append_delim`
+-- is the foundation for `scanUntilByte_consumption`.
 
 private theorem Array.getElem!_eq_getElem {α : Type} [Inhabited α]
     (a : Array α) (i : Nat) (h : i < a.size) : a[i]! = a[i] :=
@@ -156,7 +165,7 @@ private theorem ByteArray.size_append_single (a : ByteArray) (v : UInt8) (b : By
     (a ++ ⟨#[v]⟩ ++ b).size = a.size + 1 + b.size := by
   simp only [ByteArray.size_append]; rfl
 
-/-- go advances through prefix when no match found in first n positions. -/
+-- `go` advances through prefix when no match found in first n positions.
 private theorem findByte.go_advance (needle : UInt8) (bs : ByteArray)
     (n : Nat) (hn : n ≤ bs.size)
     (h_no_match : ∀ i, i < n → bs.data[i]! ≠ needle) :
@@ -175,8 +184,8 @@ private theorem findByte.go_advance (needle : UInt8) (bs : ByteArray)
       congr 1
     rw [hk_result, hstep]
 
-/-- The key theorem: findByte in (content ++ ⟨#[delim]⟩ ++ rest) = some content.size
-    when content contains no occurrence of delim. -/
+-- the key theorem: `findByte` in `(content ++ ⟨#[delim]⟩ ++ rest) = some content.size`
+-- when content contains no occurrence of delim.
 theorem findByte_append_delim (delim : UInt8) (content rest : Bytes)
     (h : ∀ i, i < content.size → content.data[i]! ≠ delim) :
     findByte delim (content ++ ⟨#[delim]⟩ ++ rest) = Option.some content.size := by
@@ -209,11 +218,11 @@ private theorem ByteArray.extract_suffix (content : Bytes) (v : UInt8) (rest : B
     show content.size + 1 = (content ++ ⟨#[v]⟩).size from by rw [ByteArray.size_append]; rfl]
   exact ByteArray.extract_append_eq_right rfl rfl
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                       // delimiter // scanners
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                      // delimiter scanners
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- scan until a single byte delimiter (delimiter consumed, not included in result). -/
+-- scan until a single byte delimiter (delimiter consumed, not included in result).
 def scanUntilByte (delim : UInt8) : Scanner Bytes where
   scan bs :=
     match findByte delim bs with
@@ -222,7 +231,7 @@ def scanUntilByte (delim : UInt8) : Scanner Bytes where
     | Option.none => ScanResult.notFound
   consumption := fun _ _ _ => trivial
 
-/-- scan until a byte sequence delimiter. -/
+-- scan until a byte sequence delimiter.
 def scanUntilBytes (delim : Bytes) : Scanner Bytes where
   scan bs :=
     match findBytes delim bs with
@@ -234,9 +243,9 @@ def scanUntilBytes (delim : Bytes) : Scanner Bytes where
 -- TODO[b7r6]: !! get to the bottom of this !!
 set_option maxHeartbeats 400000
 
-/-- tight consumption law for scanUntilByte: if content contains no occurrence
-    of delim, scanning `content ++ [delim] ++ rest` returns exactly
-    `(content, rest)`. -/
+-- tight consumption law for `scanUntilByte`: if content contains no occurrence
+-- of delim, scanning `content ++ [delim] ++ rest` returns exactly
+-- `(content, rest)`.
 theorem scanUntilByte_consumption (delim : UInt8) (content rest : Bytes)
     (h_no_delim : ∀ i, i < content.size → content.data[i]! ≠ delim) :
     (scanUntilByte delim).scan (content ++ ⟨#[delim]⟩ ++ rest) =
@@ -254,12 +263,11 @@ theorem scanUntilByte_consumption (delim : UInt8) (content rest : Bytes)
   rw [← ByteArray.append_assoc]
   exact ByteArray.extract_suffix content delim rest
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                      // predicate scanners
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                       // predicate // scanners
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
-/-- scan while predicate holds (greedy). -/
+-- scan while predicate holds (greedy).
 def scanWhile (p : UInt8 → Bool) : Scanner Bytes where
   scan bs :=
     let rec go (i : Nat) : Nat :=
@@ -272,10 +280,12 @@ def scanWhile (p : UInt8 → Bool) : Scanner Bytes where
     else ScanResult.found (bs.extract 0 idx) (bs.extract idx bs.size)
   consumption := fun _ _ _ => trivial
 
-/-- Scan while NOT predicate (until first match). -/
+-- scan while NOT predicate (until first match).
 def scanUntil (p : UInt8 → Bool) : Scanner Bytes := scanWhile (fun b => !p b)
 
-/- ── character class predicates ────────────────────────────────────────────── -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                    // character classes
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def isDigit (b : UInt8) : Bool := b >= 0x30 && b <= 0x39
 def isAlpha (b : UInt8) : Bool := (b >= 0x41 && b <= 0x5A) || (b >= 0x61 && b <= 0x7A)
@@ -288,11 +298,11 @@ def scanDigits : Scanner Bytes := scanWhile isDigit
 def scanAlphaNum : Scanner Bytes := scanWhile isAlphaNum
 def scanWhitespace : Scanner Bytes := scanWhile isWhitespace
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                      // exact match // scanner
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                     // exact match scanner
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- match exact bytes at the start of input. -/
+-- match exact bytes at the start of input.
 def exact (expected : Bytes) : Scanner Unit where
   scan bs :=
     if bs.size >= expected.size && bs.extract 0 expected.size == expected then
@@ -302,14 +312,14 @@ def exact (expected : Bytes) : Scanner Unit where
     else ScanResult.notFound
   consumption := fun _ _ _ => trivial
 
-/-- match a single exact byte. -/
+-- match a single exact byte.
 def exactByte (expected : UInt8) : Scanner Unit := exact ⟨#[expected]⟩
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                        // skip (consume, return Unit)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                       // skip (consume, return Unit)
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- skip whitespace (returns Unit for chaining). -/
+-- skip whitespace (returns `Unit` for chaining).
 def skipWhitespace : Scanner Unit where
   scan bs :=
     let rec go (i : Nat) : Nat :=
@@ -318,12 +328,12 @@ def skipWhitespace : Scanner Unit where
       else i
     termination_by bs.size - i
     ScanResult.found () (bs.extract (go 0) bs.size)
-    
+
   consumption := fun _ _ _ => trivial
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                 // combinators
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                // combinators
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def Scanner.map {α β : Type} (s : Scanner α) (f : α → β) : Scanner β where
   scan bs := s.scan bs |>.map f
@@ -333,7 +343,7 @@ def Scanner.seq {α β : Type} (s1 : Scanner α) (s2 : Scanner β) : Scanner (α
   scan bs :=
     s1.scan bs |>.bind fun a rest =>
       s2.scan rest |>.map fun b => (a, b)
-      
+
   consumption := fun _ _ _ => trivial
 
 def Scanner.optional {α : Type} (s : Scanner α) : Scanner (Option α) where
@@ -342,7 +352,7 @@ def Scanner.optional {α : Type} (s : Scanner α) : Scanner (Option α) where
     | ScanResult.found a rest  => ScanResult.found (Option.some a) rest
     | ScanResult.notFound      => ScanResult.found Option.none bs
     | ScanResult.incomplete n  => ScanResult.incomplete n
-    
+
   consumption := fun _ _ _ => trivial
 
 def Scanner.orElse {α : Type} (s1 : Scanner α) (s2 : Scanner α) : Scanner α where
@@ -351,13 +361,13 @@ def Scanner.orElse {α : Type} (s1 : Scanner α) (s2 : Scanner α) : Scanner α 
     | ScanResult.found a rest  => ScanResult.found a rest
     | ScanResult.notFound      => s2.scan bs
     | ScanResult.incomplete n  => ScanResult.incomplete n
-    
+
   consumption := fun _ _ _ => trivial
 
 instance {α : Type} : OrElse (Scanner α) where
   orElse s1 s2 := Scanner.orElse s1 (s2 ())
 
-/-- Repeat zero or more times. -/
+-- repeat zero or more times.
 partial def Scanner.many {α : Type} (s : Scanner α) : Scanner (List α) where
   scan bs :=
     match s.scan bs with
@@ -367,10 +377,10 @@ partial def Scanner.many {α : Type} (s : Scanner α) : Scanner (List α) where
       | _ => ScanResult.found [a] rest
     | ScanResult.notFound      => ScanResult.found [] bs
     | ScanResult.incomplete n  => ScanResult.incomplete n
-    
+
   consumption := fun _ _ _ => trivial
 
-/-- Repeat one or more times. -/
+-- repeat one or more times.
 def Scanner.many1 {α : Type} (s : Scanner α) : Scanner (List α) where
   scan bs :=
     match s.scan bs with
@@ -380,12 +390,12 @@ def Scanner.many1 {α : Type} (s : Scanner α) : Scanner (List α) where
       | _ => ScanResult.found [a] rest
     | ScanResult.notFound     => ScanResult.notFound
     | ScanResult.incomplete n => ScanResult.incomplete n
-    
+
   consumption := fun _ _ _ => trivial
 
--- TODO[b7r6]: this is way too much nesting for a language without a formatter...
+-- TODO[b7r6]: !! this is way too much nesting for a language without a formatter !!
 
-/-- Items separated by a delimiter scanner. -/
+-- items separated by a delimiter scanner.
 def Scanner.sepBy {α : Type} (item : Scanner α) (delim : Scanner Unit) : Scanner (List α) where
   scan bs :=
     match item.scan bs with
@@ -405,14 +415,14 @@ def Scanner.sepBy {α : Type} (item : Scanner α) (delim : Scanner Unit) : Scann
       | _ => ScanResult.found [a] rest
     | ScanResult.notFound     => ScanResult.found [] bs
     | ScanResult.incomplete n => ScanResult.incomplete n
-    
+
   consumption := fun _ _ _ => trivial
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                               // box → scanner
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                              // box -> scanner
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- lift a `Box` into a `Scanner`. `Box` is strictly less powerful — this is always safe. -/
+-- lift a `Box` into a `Scanner`. `Box` is strictly less powerful — this is always safe.
 def Scanner.fromBox {α : Type} (box : Box α) : Scanner α where
   scan bs :=
     match box.parse bs with
@@ -420,7 +430,7 @@ def Scanner.fromBox {α : Type} (box : Box α) : Scanner α where
     | ParseResult.fail      => ScanResult.notFound
   consumption := fun _ _ _ => trivial
 
-/-- parse with a `Box`, then continue with a `Scanner`. -/
+-- parse with a `Box`, then continue with a `Scanner`.
 def Scanner.boxThen {α β : Type} (box : Box α) (next : α → Scanner β) : Scanner (α × β) where
   scan bs :=
     match box.parse bs with
@@ -430,14 +440,14 @@ def Scanner.boxThen {α β : Type} (box : Box α) (next : α → Scanner β) : S
       | ScanResult.notFound      => ScanResult.notFound
       | ScanResult.incomplete n  => ScanResult.incomplete n
     | ParseResult.fail => ScanResult.notFound
-    
+
   consumption := fun _ _ _ => trivial
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                        // string // conversion
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                       // string conversion
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- Convert scanned bytes to String (UTF-8). Fails on invalid encoding. -/
+-- convert scanned bytes to String (UTF-8). fails on invalid encoding.
 def Scanner.asString (s : Scanner Bytes) : Scanner String where
   scan bs :=
     match s.scan bs with
@@ -447,12 +457,12 @@ def Scanner.asString (s : Scanner Bytes) : Scanner String where
       | Option.none     => ScanResult.notFound
     | ScanResult.notFound     => ScanResult.notFound
     | ScanResult.incomplete n => ScanResult.incomplete n
-    
+
   consumption := fun _ _ _ => trivial
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                        // common // delimiters
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                       // common delimiters
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def LF    : UInt8 := 0x0A
 def CR    : UInt8 := 0x0D
@@ -469,9 +479,9 @@ def scanUntilComma : Scanner Bytes := scanUntilByte COMMA
 def scanLineStr    : Scanner String := scanLine.asString
 def scanCRLFLineStr : Scanner String := scanCRLFLine.asString
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                       // tests
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                      // tests
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 -- TODO[b7r6]: !! write real tests !!
 

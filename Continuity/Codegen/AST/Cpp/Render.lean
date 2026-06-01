@@ -1,23 +1,33 @@
 import Continuity.Codegen.AST.Cpp.Ast
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                  // continuity // emit // cpp
-                                                                   render.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  C++ renderer — the ONLY place C++ text is assembled.
+      "The knob was ridiculous, handmade, baleful; it was there
+      to welcome him back to Mexico. But it was the door behind
+      the knob that held his attention, the way it rendered the
+      space around it into something legible, something that
+      spoke. Every surface in the room was a language if you
+      knew how to read it, every object a glyph that had been
+      rendered there by a hand that understood the grammar of
+      presence and absence equally well."
 
-  Four render functions:
-    renderType — types (no trailing space; caller adds where needed)
-    renderExpr — expressions (no semicolons; statements add them)
-    renderStmt — statements (semicolons, braces, indentation)
-    renderDecl — top-level declarations
+                                                                    — Count Zero
 
-  renderFile assembles a complete .hpp with pragma-once and header comment.
--/
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Codegen.AST.Cpp
+
+/-
+  `C++` renderer — the ONLY place `C++` text is assembled.
+
+  Four render functions:
+    `renderType` — types (no trailing space; caller adds where needed)
+    `renderExpr` — expressions (no semicolons; statements add them)
+    `renderStmt` — statements (semicolons, braces, indentation)
+    `renderDecl` — top-level declarations
+
+  `renderFile` assembles a complete .hpp with pragma-once and header comment.
+-/
 
 private def pad (n : Nat) : String := "".pushn ' ' n
 
@@ -32,10 +42,9 @@ private def escapeStr (s : String) : String :=
     | c    => acc.push c
   ) ""
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                 // render type
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                 // render type
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 partial def renderType (ty : CType) : String :=
   match ty with
@@ -66,10 +75,9 @@ partial def renderType (ty : CType) : String :=
     let argStr := ", ".intercalate (args.map renderType)
     s!"{name}<{argStr}>"
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                 // operators
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                 // operators
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def renderBinOp : BinOp → String
   | BinOp.add    => "+"  | BinOp.sub    => "-"
@@ -98,10 +106,9 @@ private def renderAssignOp : BinOp → String
   | BinOp.shl    => "<<=" | BinOp.shr    => ">>="
   | op           => renderBinOp op ++ "="  -- fallback
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                           // render expression
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // render expression
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 partial def renderExpr (expr : CExpr) : String :=
   match expr with
@@ -149,10 +156,9 @@ partial def renderExpr (expr : CExpr) : String :=
   | CExpr.sizeofExpr expr => s!"sizeof({renderExpr expr})"
   | CExpr.parens inner    => s!"({renderExpr inner})"
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                           // render statement
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // render statement
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 partial def renderStmt (stmt : CStmt) (ind : Nat := 0) : String :=
   let p := pad ind
@@ -204,14 +210,13 @@ partial def renderStmt (stmt : CStmt) (ind : Nat := 0) : String :=
   | CStmt.blank => ""
 
 where
-  /-- render a list of statements as a block body -/
+  -- render a list of statements as a block body
   renderBlock (stmts : List CStmt) (ind : Nat) : String :=
     "\n".intercalate (stmts.map fun s => renderStmt s ind)
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                          // render declaration
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // render declaration
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 partial def renderDecl (decl : CDecl) (ind : Nat := 0) : String :=
   let p := pad ind
@@ -267,10 +272,9 @@ partial def renderDecl (decl : CDecl) (ind : Nat := 0) : String :=
   | CDecl.blank => ""
   | CDecl.raw text => text
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                               // render file
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                               // render file
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def renderFile (f : CFile) : String :=
   let header := match f.header with
@@ -280,12 +284,11 @@ def renderFile (f : CFile) : String :=
   let body := "\n\n".intercalate (f.decls.map fun d => renderDecl d)
   header ++ pragma ++ body ++ "\n"
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                       // tests
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                       // tests
-   ════════════════════════════════════════════════════════════════════════════════ -/
-
--- ── types ─────────────────────────────────────────────────────────────────────
+-- types
 
 #guard renderType CType.void == "void"
 #guard renderType CType.bool == "bool"
@@ -303,7 +306,7 @@ def renderFile (f : CFile) : String :=
 #guard renderType CType.byteVec == "std::vector<uint8_t>"
 #guard renderType (CType.array CType.u8 32) == "std::array<uint8_t, 32>"
 
--- ── expressions ───────────────────────────────────────────────────────────────
+-- expressions
 
 #guard renderExpr (CExpr.litInt 42) == "42"
 #guard renderExpr (CExpr.litBool true) == "true"
@@ -320,14 +323,14 @@ def renderFile (f : CFile) : String :=
 #guard renderExpr (CExpr.cast "static_cast" CType.u8 (CExpr.var "x"))
   == "static_cast<uint8_t>(x)"
 
--- ── statements ────────────────────────────────────────────────────────────────
+-- statements
 
 #guard renderStmt (CStmt.ret (CExpr.litBool false)) == "return false;"
 #guard renderStmt (CStmt.retVoid) == "return;"
 #guard renderStmt (CStmt.decl CType.u64 "offset" (Option.some (CExpr.litInt 0)))
   == "uint64_t offset = 0;"
 
--- ── visual: a real codec header ───────────────────────────────────────────────
+-- visual: a real codec header
 
 private def testNarHeader : CFile :=
   let fields : List CField := [⟨CType.u64, "magic"⟩, ⟨CType.u64, "tag_len"⟩]

@@ -2,18 +2,31 @@ import Continuity.Codegen.AST.Cpp.Ast
 import Continuity.Codegen.AST.Cpp.Render
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                  // continuity // build // cpp
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  Builder DSL — monadic helpers for ergonomic C++ AST construction.
+      "The breakers rolled in, their edges transparent as green
+      glass, and when they broke they left a foam that the sand
+      drank instantly. He watched the process, the endless
+      construction and deconstruction, and thought about the way
+      a builder might watch his scaffolds rise and fall, each
+      temporary form yielding to the next, each iteration closer
+      to the shape he held in mind, a shape no one else could see
+      until the final form emerged from the scaffolding."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
+namespace Continuity.Codegen.AST.Cpp
+
+/-
+  Builder DSL — monadic helpers for ergonomic `C++` AST construction.
 
   Two builder monads:
-    StmtM — accumulates statements (function bodies, if-blocks, loops)
-    FileM — accumulates top-level declarations (includes, structs, functions)
+    `StmtM` — accumulates statements (function bodies, if-blocks, loops)
+    `FileM` — accumulates top-level declarations (includes, structs, functions)
 
   Plus short aliases in the `C` namespace for expression building
-  and `Ty` for type building. Same idea as Haskell's `E`/`T`/`P`.
+  and `Ty` for type building. Same idea as `Haskell`'s `E`/`T`/`P`.
 
   The key ergonomic win: statement builders. A pack function goes from
 
@@ -28,15 +41,13 @@ import Continuity.Codegen.AST.Cpp.Render
       memcpy (C.addOffset "buf" 8) (C.addrOfField "s" "tag_len") 8
 -/
 
-namespace Continuity.Codegen.AST.Cpp
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                     // expression // shortcuts
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                     // expression // shortcuts
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
-/-! the `C` namespace holds one-liner expression builders. short and
-    unambiguous — `C.var`, `C.call`, `C.field`. same role as `E` in
-    the Haskell builder. -/
+-- the `C` namespace holds one-liner expression builders. short and
+-- unambiguous — `C.var`, `C.call`, `C.field`. same role as `E` in
+-- the `Haskell` builder.
 
 namespace C
 
@@ -57,17 +68,17 @@ def call (fn : String) (args : List CExpr) : CExpr := CExpr.call fn args
 
 def methodCall (e : CExpr) (m : String) (args : List CExpr) : CExpr :=
   CExpr.methodCall e m args
-  
+
 def method0 (e : CExpr) (m : String) : CExpr := CExpr.methodCall e m []
 
--- ── arithmetic ────────────────────────────────────────────────────────────────
+-- arithmetic
 
 def add (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.add a b
 def sub (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.sub a b
 def mul (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.mul a b
 def mod (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.mod a b
 
--- ── comparison ────────────────────────────────────────────────────────────────
+-- comparison
 
 def eq (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.eq a b
 def ne (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.ne a b
@@ -76,14 +87,14 @@ def le (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.le a b
 def gt (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.gt a b
 def ge (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.ge a b
 
--- ── bitwise ───────────────────────────────────────────────────────────────────
+-- bitwise
 
 def bitAnd (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.bitAnd a b
 def bitOr (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.bitOr a b
 def shl (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.shl a b
 def shr (a : CExpr) (b : CExpr) : CExpr := CExpr.binop BinOp.shr a b
 
--- ── unary ─────────────────────────────────────────────────────────────────────
+-- unary
 
 def addrOf (e : CExpr) : CExpr := CExpr.unop UnOp.addrOf e
 def deref (e : CExpr) : CExpr := CExpr.unop UnOp.deref e
@@ -91,7 +102,7 @@ def logNot (e : CExpr) : CExpr := CExpr.unop UnOp.logNot e
 def bitNot (e : CExpr) : CExpr := CExpr.unop UnOp.bitNot e
 def neg (e : CExpr) : CExpr := CExpr.unop UnOp.neg e
 
--- ── compound ──────────────────────────────────────────────────────────────────
+-- compound
 
 def addrOfField (structVar : String) (fieldName : String) : CExpr :=
   CExpr.addrOfField structVar fieldName
@@ -115,12 +126,12 @@ def nullopt : CExpr := CExpr.qual "std" "nullopt"
 
 end C
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                           // type // shortcuts
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // type // shortcuts
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-! `Ty` namespace for type construction. CType already has u8/u64/etc.
-    as namespace members, so `Ty` just re-exports and adds convenience. -/
+-- `Ty` namespace for type construction. `CType` already has u8/u64/etc.
+-- as namespace members, so `Ty` just re-exports and adds convenience.
 
 namespace Ty
 
@@ -151,95 +162,94 @@ def array (t : CType) (n : Nat) : CType := CType.array t n
 
 end Ty
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                        // statement // builder
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                        // statement // builder
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- Accumulates C++ statements. Use with `buildStmts do ...` -/
+-- accumulates `C++` statements. use with `buildStmts do ...`
 abbrev StmtM := StateM (List CStmt)
 
--- ── core statement emitters ───────────────────────────────────────────────────
+-- core statement emitters
 
-/-- emit a raw statement -/
+-- emit a raw statement
 def emit (s : CStmt) : StmtM Unit :=
   modify fun ss => ss ++ [s]
 
-/-- emit an expression as a statement: `expr;` -/
+-- emit an expression as a statement: `expr;`
 def exprStmt (e : CExpr) : StmtM Unit := emit (CStmt.expr e)
 
-/-- `type name = init;` or `type name;` -/
+-- `type name = init;` or `type name;`
 def decl (ty : CType) (name : String) (init : Option CExpr := Option.none) : StmtM Unit :=
   emit (CStmt.decl ty name init)
 
-/-- `lhs = rhs;` -/
+-- `lhs = rhs;`
 def assign (lhs : CExpr) (rhs : CExpr) : StmtM Unit :=
   emit (CStmt.assign lhs rhs)
 
-/-- `lhs op= rhs;` -/
+-- `lhs op= rhs;`
 def assignOp (op : BinOp) (lhs : CExpr) (rhs : CExpr) : StmtM Unit :=
   emit (CStmt.assignOp op lhs rhs)
 
-/-- `return expr;` -/
+-- `return expr;`
 def ret (e : CExpr) : StmtM Unit := emit (CStmt.ret e)
 
-/-- `return;` -/
+-- `return;`
 def retVoid : StmtM Unit := emit CStmt.retVoid
 
-/-- `// comment` -/
+-- `// comment`
 def comment (text : String) : StmtM Unit := emit (CStmt.comment text)
 
-/-- blank line -/
+-- blank line
 def blank : StmtM Unit := emit CStmt.blank
 
--- ── compound statements ──────────────────────────────────────────────────────
+-- compound statements
 
-/-- `if (cond) { body }` -/
+-- `if (cond) { body }`
 def ifThen (cond : CExpr) (body : StmtM Unit) : StmtM Unit :=
   let (_, stmts) := body.run []
   emit (CStmt.ifElse cond stmts Option.none)
 
-/-- `if (cond) { thenBody } else { elseBody }` -/
+-- `if (cond) { thenBody } else { elseBody }`
 def ifElse (cond : CExpr) (thenBody : StmtM Unit) (elseBody : StmtM Unit) : StmtM Unit :=
   let (_, thenStmts) := thenBody.run []
   let (_, elseStmts) := elseBody.run []
   emit (CStmt.ifElse cond thenStmts (Option.some elseStmts))
 
-/-- `for (type i = init; cond; step) { body }` -/
+-- `for (type i = init; cond; step) { body }`
 def forLoop (ty : CType) (name : String) (init : CExpr) (cond : CExpr) (step : CExpr)
     (body : StmtM Unit) : StmtM Unit :=
   let (_, stmts) := body.run []
   emit (CStmt.for_ (CStmt.decl ty name (Option.some init)) cond step stmts)
 
-/-- `for (auto& name : range) { body }` -/
+-- `for (auto& name : range) { body }`
 def rangeFor (name : String) (range : CExpr) (body : StmtM Unit) : StmtM Unit :=
   let (_, stmts) := body.run []
   emit (CStmt.rangeFor (CType.ref CType.auto) name range stmts)
 
--- ── codec-specific helpers ────────────────────────────────────────────────────
+-- codec-specific helpers
 
-/-- `memcpy(dst, src, n);` -/
+-- `memcpy(dst, src, n);`
 def memcpy (dst : CExpr) (src : CExpr) (n : Nat) : StmtM Unit :=
   exprStmt (CExpr.memcpy dst src n)
 
-/-- `if (lenExpr < minSize) return std::nullopt;` -/
+-- `if (lenExpr < minSize) return std::nullopt;`
 def sizeCheck (lenExpr : CExpr) (minSize : Nat) : StmtM Unit :=
   emit (CStmt.sizeCheck lenExpr minSize)
 
-/-- `out.push_back(expr);` -/
+-- `out.push_back(expr);`
 def pushBack (vec : String) (value : CExpr) : StmtM Unit :=
   exprStmt (CExpr.methodCall (CExpr.var vec) "push_back" [value])
 
-/-- Run a statement builder, producing a statement list -/
+-- run a statement builder, producing a statement list
 def buildStmts (m : StmtM Unit) : List CStmt :=
   let (_, stmts) := m.run []
   stmts
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                      // declaration // builder
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                      // declaration // builder
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
-
-/-- accumulates C++ top-level declarations. Use with `buildFile do ...` -/
+-- accumulates `C++` top-level declarations. use with `buildFile do ...`
 abbrev FileM := StateM (List CDecl)
 
 namespace FileM
@@ -256,17 +266,17 @@ def blank : FileM Unit :=
 def comment (text : String) : FileM Unit :=
   modify fun ds => ds ++ [CDecl.comment text]
 
-/-- struct from a list of (type, name) pairs -/
+-- struct from a list of (type, name) pairs
 def struct_ (name : String) (fields : List (CType × String)) : FileM Unit :=
   modify fun ds => ds ++ [CDecl.struct_ name (fields.map fun (t, n) => ⟨t, n⟩)]
 
-/-- function with body built from a StmtM -/
+-- function with body built from a `StmtM`
 def func (retTy : CType) (name : String) (params : List (CType × String))
     (body : StmtM Unit) : FileM Unit :=
   let ps : List CParam := params.map fun (t, n) => ⟨t, n⟩
   modify fun ds => ds ++ [CDecl.func retTy name ps (buildStmts body)]
 
-/-- namespace wrapping a nested FileM -/
+-- namespace wrapping a nested `FileM`
 def namespace_ (name : String) (inner : FileM Unit) : FileM Unit :=
   let (_, decls) := inner.run []
   modify fun ds => ds ++ [CDecl.namespace_ name decls]
@@ -287,19 +297,18 @@ def raw (text : String) : FileM Unit :=
 
 end FileM
 
-/-- run a declaration builder, producing a CFile -/
+-- run a declaration builder, producing a `CFile`
 def buildFile (header : Option String := Option.none) (m : FileM Unit) : CFile :=
   let (_, decls) := m.run []
   { header := header, decls := decls }
 
-
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                       // tests
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                       // tests
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 -- TODO[b7r6]: !! write real tests !!
 
--- ── statement builder ─────────────────────────────────────────────────────────
+-- statement builder
 
 -- #eval renderFile (buildFile (Option.some "Generated by Continuity — do not edit") do
 --   FileM.includeSystem "cstdint"
@@ -333,6 +342,5 @@ def buildFile (header : Option String := Option.none) (m : FileM Unit) : CFile :
 --         memcpy (C.addrOfField "out" "tag_len")
 --           (C.add (C.method0 (C.var "buf") "data") (C.litInt 8)) 8
 --         ret (C.var "out"))
-
 
 end Continuity.Codegen.AST.Cpp

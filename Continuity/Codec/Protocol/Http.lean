@@ -3,7 +3,39 @@ import Continuity.Codec.Core.Scanner
 
 set_option autoImplicit false
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "the breakers rolled in, their edges transparent
+      as green glass, and beneath them the tide pulled
+      everything toward some invisible destination. Each
+      wave carried a method inscribed in its crest — GET,
+      POST, the ancient verbs of an older sea — followed
+      by a train of headers that described what the wave
+      wanted, what it was willing to accept, how long it
+      would wait. The shore was nothing but an agreement,
+      a status code returned in the undertow, and when
+      the wave broke it left behind a body — or nothing
+      at all."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 namespace Continuity.Codec.Protocol.Http
+/-
+  The HTTP Protocol (RFC 9110).
+
+  HTTP/1.x message format: request line and status line,
+  followed by a sequence of header fields and an optional
+  body. Transfer encodings include identity, chunked,
+  gzip, deflate, and compress.
+
+  `CRLF` delimits lines; the body length is determined
+  by `Content-Length` or `Transfer-Encoding: chunked`.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                  // core // method and header
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 open Continuity.Codec.Core.Box
 
@@ -42,6 +74,10 @@ structure Response where
   statusLine : StatusLine
   headers : List Header
   body : Option Bytes
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                 // parse // request utilities
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def CRLF : Bytes := "\r\n".toUTF8
 

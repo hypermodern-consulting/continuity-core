@@ -4,49 +4,53 @@ import Continuity.Codegen.AST.Haskell.Ast
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                          // continuity // codegen // codec spec
-                                                                      spec.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  CodecSpec — abstract description of a wire format codec.
+      "He was a specialist in the extraction of top executives
+      and research people."
 
-  This sits between the Lean Box/Parser definitions (which carry proofs)
+                                                                      — Count Zero
+
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
+namespace Continuity.Codegen.Codec
+
+/-
+  `CodecSpec` — abstract description of a wire format codec.
+
+  This sits between the Lean `Box`/`Parser` definitions (which carry proofs)
   and the target-language code (C++/Haskell, which doesn't). The spec
   captures the operational content — types, parse/serialize steps, enum
   tables — without the proof obligations.
 
-  Each protocol gets a CodecModule. Main.lean walks the modules and
+  Each protocol gets a `CodecModule`. `Main.lean` walks the modules and
   emits C++ and Haskell files.
 -/
 
-namespace Continuity.Codegen.Codec
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                             // spec // types
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/-- Primitive wire types that map directly to target-language types. -/
 inductive WireType where
   | u8 | u16le | u32le | u64le | u16be | u32be | u64be
-  | bool64                   -- Nix-style: u64, 0=false
-  | varint                   -- protobuf variable-length
-  | bytes (n : Nat)          -- fixed-length byte array
-  | lenPrefixed              -- u64le length + payload
-  | padded (align : Nat)     -- Nix-style: data + zero-pad to alignment
+  | bool64
+  | varint
+  | bytes (n : Nat)
+  | lenPrefixed
+  | padded (align : Nat)
   deriving Repr
 
-/-- Field in a struct definition. -/
 structure FieldSpec where
   name : String
   wireType : WireType
   doc : String := ""
   deriving Repr
 
-/-- Enum variant with numeric code. -/
 structure EnumVariant where
   name : String
   code : Nat
   doc : String := ""
   deriving Repr
 
-/-- A complete enum type (like WorkerOp, FrameType). -/
 structure EnumSpec where
   name : String
   variants : List EnumVariant
@@ -54,14 +58,12 @@ structure EnumSpec where
   doc : String := ""
   deriving Repr
 
-/-- A struct type (like NixString, Frame, PackHeader). -/
 structure StructSpec where
   name : String
   fields : List FieldSpec
   doc : String := ""
   deriving Repr
 
-/-- A named constant (like WORKER_MAGIC_1). -/
 structure ConstSpec where
   name : String
   wireType : WireType
@@ -69,20 +71,18 @@ structure ConstSpec where
   doc : String := ""
   deriving Repr
 
-/-- A complete codec module — one per protocol. -/
 structure CodecModule where
-  name : String              -- e.g. "Nix", "Protobuf", "Git"
-  namespace_ : String        -- e.g. "continuity::nix"
+  name : String
+  namespace_ : String
   doc : String := ""
   constants : List ConstSpec := []
   enums : List EnumSpec := []
   structs : List StructSpec := []
   deriving Repr
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                      // protocol specifications
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                // protocol // specifications
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def nixModule : CodecModule where
   name := "Nix"
@@ -332,7 +332,6 @@ def varintModule : CodecModule where
     ⟨"Varint", [⟨"value", .u64le, "Decoded value"⟩], "1-10 bytes on wire"⟩
   ]
 
-/-- All protocol modules for codegen. -/
 def allModules : List CodecModule :=
   [ nixModule, protobufModule, gitModule, gitTransportModule
   , httpModule, http2Module, http3Module

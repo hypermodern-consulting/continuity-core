@@ -3,7 +3,37 @@ import Continuity.Codec.Core.Bytes
 
 set_option autoImplicit false
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "Machine dreams hold a special vertigo. Not the simple binary
+      of awake and asleep, but something denser — a file folded
+      into files, each layer a delta compressed against the last,
+      until the origin is nothing more than a rumor encoded at
+      the bottom of the stack. The machines do not forget; they
+      merely accumulate, history pressing down like gravity, each
+      object a commitment that cannot be unwound. To read them
+      is to fall backward through a chain of packed intentions."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 namespace Continuity.Codec.Protocol.Git
+/-
+  The Git Pack Format.
+
+  A binary protocol for storing objects in a compressed,
+  self-contained archive. Packs use deltified representation:
+  objects reference prior objects via offset or hash, with
+  the full graph reconstructed on inflation by `Zlib`.
+
+  Targets `git pack-objects` and `git index-pack` wire format:
+    `.pack` — compressed object data with trailing checksum
+    `.idx`  — fanout table mapping object ids to pack offsets
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                              // core // pack
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 open Continuity.Codec.Core.Box Continuity.Codec.Core.Bytes
 
@@ -22,6 +52,10 @@ def ObjectType.toNat : ObjectType → Nat
 def ObjectType.fromNat : Nat → Option ObjectType
   | 1 => some .commit | 2 => some .tree | 3 => some .blob | 4 => some .tag
   | 6 => some .ofsDelta | 7 => some .refDelta | _ => none
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                     // parse // type and size
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def parseTypeSize (bs : Bytes) : ParseResult (ObjectType × Nat) :=
   if _ : bs.size > 0 then
@@ -51,7 +85,7 @@ def parseOfsOffset (bs : Bytes) : ParseResult Nat :=
   if _ : bs.size > 0 then
     let b0 := bs.data[0]!
     let acc0 := b0.toNat &&& 0x7F
-    
+
     if b0 &&& 0x80 == 0 then .ok acc0 (bs.extract 1 bs.size)
     else
       let rec go (i : Nat) (acc : Nat) : ParseResult Nat :=
@@ -64,8 +98,12 @@ def parseOfsOffset (bs : Bytes) : ParseResult Nat :=
         else .fail
       termination_by bs.size - i
       go 1 acc0
-      
+
   else .fail
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                     // core // object identity
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure ObjectId where
   bytes : Bytes
@@ -77,6 +115,10 @@ def parseObjectId20 (bs : Bytes) : ParseResult ObjectId :=
     .ok ⟨bs.extract 0 20, Or.inl (by rw [ByteArray.size_extract]; omega)⟩
         (bs.extract 20 bs.size)
   else .fail
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                      // structures // metadata
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure ZlibDecompressor where
   inflate : Bytes → Option (Bytes × Nat)

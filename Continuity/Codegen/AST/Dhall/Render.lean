@@ -1,27 +1,39 @@
 import Continuity.Codegen.AST.Dhall.Ast
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                   // continuity // emit // dhall
-                                                                    render.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+set_option autoImplicit false
 
-/-!
-  Dhall renderer — the ONLY place Dhall text is assembled.
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "They set a slamhound on Turner's trail in New Delhi, slotted it to
+      his pheromones and the color of his hair. It caught the scent of him
+      first in the crowded streets near Connaught Place, locked onto his
+      thermal ghost threading between the rickshaws and the white
+      Ambassador cars, and began to render. Layer by layer it peeled the
+      city apart — the smells, the heat signatures, the reflected
+      fluorescence — until only the target remained, a single irreducible
+      shape stripped of every context except the one the hound was built
+      to recognize."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
+namespace Continuity.Codegen.AST.Dhall
+
+/-
+  `Dhall` renderer — the ONLY place `Dhall` text is assembled.
 
   One function: `render`. Everything else is a helper called by `render`.
   Generated files should be parseable by `dhall format` without changes.
 -/
 
-namespace Continuity.Codegen.AST.Dhall
-
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                // helpers
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                // helpers
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def pad (n : Nat) : String := "".pushn ' ' n
 
-/-- escape a string for dhall double-quoted text -/
+-- escape a string for `Dhall` double-quoted text
 private def escapeText (s : String) : String :=
   s.foldl (fun acc c =>
     match c with
@@ -33,7 +45,7 @@ private def escapeText (s : String) : String :=
     | c    => acc.push c
   ) ""
 
-/-- render a binary operator to its dhall symbol -/
+-- render a binary operator to its `Dhall` symbol
 private def renderBinOp : BinOp → String
   | BinOp.equiv        => "==="
   | BinOp.prefer       => "//"
@@ -48,7 +60,7 @@ private def renderBinOp : BinOp → String
   | BinOp.natPlus      => "+"
   | BinOp.natTimes     => "*"
 
-/-- render an import reference -/
+-- render an import reference
 private def renderImport : Import → String
   | Import.file path       => s!"./{path}"
   | Import.parentFile path => s!"../{path}"
@@ -57,22 +69,21 @@ private def renderImport : Import → String
   | Import.env name        => s!"env:{name}"
   | Import.missing         => "missing"
 
-/-- render import mode suffix -/
+-- render import mode suffix
 private def renderImportMode : ImportMode → String
   | ImportMode.code       => ""
   | ImportMode.asText     => " as Text"
   | ImportMode.asBytes    => " as Bytes"
   | ImportMode.asLocation => " as Location"
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                     // render
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                     // render
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 partial def render (e : Expr) (indent : Nat := 0) : String :=
   match e with
 
-  -- ── literals ──────────────────────────────────────────────────────────────
+  -- literals
 
   | Expr.bool true  => "True"
   | Expr.bool false => "False"
@@ -96,7 +107,7 @@ partial def render (e : Expr) (indent : Nat := 0) : String :=
     ) ""
     "''\n" ++ inner ++ "\n''"
 
-  -- ── references ────────────────────────────────────────────────────────────
+  -- references
 
   | Expr.var name => name
 
@@ -106,7 +117,7 @@ partial def render (e : Expr) (indent : Nat := 0) : String :=
   | Expr.import_ ref mode (Option.some hash) =>
     renderImport ref ++ " sha256:" ++ hash ++ renderImportMode mode
 
-  -- ── collections ───────────────────────────────────────────────────────────
+  -- collections
 
   | Expr.list [] (Option.some ty) => s!"[] : {render ty indent}"
   | Expr.list [] Option.none      => "[] : List {}"
@@ -114,7 +125,7 @@ partial def render (e : Expr) (indent : Nat := 0) : String :=
     let inner := ", ".intercalate (elements.map (fun e => render e indent))
     s!"[ {inner} ]"
 
-  -- ── records ───────────────────────────────────────────────────────────────
+  -- records
 
   | Expr.record [] => "{=}"
 
@@ -149,7 +160,7 @@ partial def render (e : Expr) (indent : Nat := 0) : String :=
   | Expr.projectType expr ty =>
     s!"{render expr indent}.({render ty indent})"
 
-  -- ── unions ────────────────────────────────────────────────────────────────
+  -- unions
 
   | Expr.unionType alts =>
     let inner := " | ".intercalate (alts.map fun (name, payload) =>
@@ -166,7 +177,7 @@ partial def render (e : Expr) (indent : Nat := 0) : String :=
     let unionStr := render (Expr.unionType alts) indent
     s!"{unionStr}.{tag} {render value indent}"
 
-  -- ── functions ─────────────────────────────────────────────────────────────
+  -- functions
 
   | Expr.lambda param paramType body =>
     s!"λ({param} : {render paramType indent}) → {render body indent}"
@@ -185,7 +196,7 @@ partial def render (e : Expr) (indent : Nat := 0) : String :=
       | _ => render arg indent
     s!"{render fn indent} {argStr}"
 
-  -- ── binding ───────────────────────────────────────────────────────────────
+  -- binding
 
   | Expr.letIn name Option.none value body =>
     let ind := pad indent
@@ -198,7 +209,7 @@ partial def render (e : Expr) (indent : Nat := 0) : String :=
   | Expr.ite cond thenBranch elseBranch =>
     s!"if {render cond indent} then {render thenBranch indent} else {render elseBranch indent}"
 
-  -- ── operators ─────────────────────────────────────────────────────────────
+  -- operators
 
   | Expr.binop op lhs rhs =>
     s!"{render lhs indent} {renderBinOp op} {render rhs indent}"
@@ -210,20 +221,20 @@ partial def render (e : Expr) (indent : Nat := 0) : String :=
     let pathStr := ".".intercalate path
     s!"{render expr indent} with {pathStr} = {render value indent}"
 
-  -- ── annotation ────────────────────────────────────────────────────────────
+  -- annotation
 
   | Expr.annot expr ty => s!"{render expr indent} : {render ty indent}"
 
-  -- ── optional ──────────────────────────────────────────────────────────────
+  -- optional
 
   | Expr.some value => s!"Some {render value indent}"
   | Expr.none ty    => s!"None {render ty indent}"
 
-  -- ── builtins ──────────────────────────────────────────────────────────────
+  -- builtins
 
   | Expr.builtin name => name
 
-  -- ── special forms ─────────────────────────────────────────────────────────
+  -- special forms
 
   | Expr.merge handler union Option.none =>
     s!"merge {render handler indent} {render union indent}"
@@ -240,16 +251,16 @@ partial def render (e : Expr) (indent : Nat := 0) : String :=
   | Expr.assert annot =>
     s!"assert : {render annot indent}"
 
-  -- ── metadata ──────────────────────────────────────────────────────────────
+  -- metadata
 
   | Expr.comment text body =>
     let ind := pad indent
     s!"{ind}\{- {text} -}\n{render body indent}"
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                 // module render
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                             // module // render
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def renderModule (m : Module) : String :=
   let header := match m.header with
@@ -257,14 +268,13 @@ def renderModule (m : Module) : String :=
     | Option.some h => s!"\{- {h} -}\n\n"
   header ++ render m.body
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                       // tests
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                       // tests
-   ════════════════════════════════════════════════════════════════════════════════ -/
+-- regression tests. every constructor gets at least one `#guard`.
 
-/-! regression tests. every constructor gets at least one #guard. -/
-
--- ── literals ──────────────────────────────────────────────────────────────────
+-- literals
 
 #guard render (Expr.bool true)       == "True"
 #guard render (Expr.bool false)      == "False"
@@ -277,27 +287,27 @@ def renderModule (m : Module) : String :=
 #guard render (Expr.var "x")         == "x"
 #guard render (Expr.builtin "Natural") == "Natural"
 
--- ── collections ───────────────────────────────────────────────────────────────
+-- collections
 
 #guard render (Expr.list [] (Option.some (Expr.builtin "Natural"))) == "[] : Natural"
 #guard render (Expr.list [Expr.natural 1, Expr.natural 2] Option.none) == "[ 1, 2 ]"
 
--- ── records ───────────────────────────────────────────────────────────────────
+-- records
 
 #guard render (Expr.record []) == "{=}"
 #guard render (Expr.record [("name", Expr.text "foo")]) == "{ name = \"foo\" }"
 
--- ── unions ────────────────────────────────────────────────────────────────────
+-- unions
 
 #guard render (Expr.unionType [("x86_64", Option.none), ("aarch64", Option.none)])
   == "< x86_64 | aarch64 >"
 
--- ── optional ──────────────────────────────────────────────────────────────────
+-- optional
 
 #guard render (Expr.some (Expr.natural 42)) == "Some 42"
 #guard render (Expr.none (Expr.builtin "Natural")) == "None Natural"
 
--- ── lambda / forall ───────────────────────────────────────────────────────────
+-- lambda / forall
 
 #guard render (Expr.lambda "x" (Expr.builtin "Natural") (Expr.var "x"))
   == "λ(x : Natural) → x"
@@ -307,21 +317,21 @@ def renderModule (m : Module) : String :=
 #guard render (Expr.arrow (Expr.builtin "Natural") (Expr.builtin "Bool"))
   == "Natural → Bool"
 
--- ── application ──────────────────────────────────────────────────────────────
+-- application
 
 #guard render (Expr.app (Expr.var "f") (Expr.var "x")) == "f x"
 
--- ── annotation ───────────────────────────────────────────────────────────────
+-- annotation
 
 #guard render (Expr.annot (Expr.natural 42) (Expr.builtin "Natural"))
   == "42 : Natural"
 
--- ── if/then/else ──────────────────────────────────────────────────────────────
+-- if/then/else
 
 #guard render (Expr.ite (Expr.var "debug") (Expr.text "-O0") (Expr.text "-O2"))
   == "if debug then \"-O0\" else \"-O2\""
 
--- ── operators ─────────────────────────────────────────────────────────────────
+-- operators
 
 #guard render (Expr.binop BinOp.prefer (Expr.var "defaults") (Expr.var "overrides"))
   == "defaults // overrides"
@@ -332,44 +342,44 @@ def renderModule (m : Module) : String :=
 #guard render (Expr.binop BinOp.natPlus (Expr.natural 1) (Expr.natural 2))
   == "1 + 2"
 
--- ── with ──────────────────────────────────────────────────────────────────────
+-- with
 
 #guard render (Expr.with (Expr.var "config") ["compiler", "flags"] (Expr.var "newFlags"))
   == "config with compiler.flags = newFlags"
 
--- ── completion ────────────────────────────────────────────────────────────────
+-- completion
 
 #guard render (Expr.completion (Expr.var "Config") (Expr.var "myConfig"))
   == "Config::myConfig"
 
--- ── imports ───────────────────────────────────────────────────────────────────
+-- imports
 
 #guard render (Expr.importFile "prelude/Types.dhall") == "./prelude/Types.dhall"
 #guard render (Expr.importFileAsText "scripts/build.sh")
   == "./scripts/build.sh as Text"
 #guard render (Expr.importEnv "HOME") == "env:HOME"
 
--- ── merge ─────────────────────────────────────────────────────────────────────
+-- merge
 
 #guard render (Expr.merge (Expr.var "handler") (Expr.var "input") Option.none)
   == "merge handler input"
 
--- ── toMap ─────────────────────────────────────────────────────────────────────
+-- toMap
 
 #guard render (Expr.toMap (Expr.var "envVars") Option.none)
   == "toMap envVars"
 
--- ── assert ────────────────────────────────────────────────────────────────────
+-- assert
 
 #guard render (Expr.assert (Expr.binop BinOp.equiv (Expr.natural 1) (Expr.natural 1)))
   == "assert : 1 === 1"
 
--- ── projection ────────────────────────────────────────────────────────────────
+-- projection
 
 #guard render (Expr.project (Expr.var "config") ["arch", "os"])
   == "config.{ arch, os }"
 
--- ── combinators ──────────────────────────────────────────────────────────────
+-- combinators
 
 #guard render (Expr.nat 7)     == "7"
 #guard render (Expr.str "hi")  == "\"hi\""
@@ -377,27 +387,8 @@ def renderModule (m : Module) : String :=
 #guard render (Expr.ff)        == "False"
 #guard render (Expr.ty "Text") == "Text"
 
--- ── visual: record merge composition ──────────────────────────────────────────
+-- TODO[b7r6]: !! decide what to do with all of these `#eval` stanzas !!
 
--- TODO[b7r6]: decide what to do with all of these `#eval` stanzas...
--- #eval render (Expr.binop BinOp.prefer
---   (Expr.importFile "defaults.dhall")
---   (Expr.record [
---     ("flags", Expr.binop BinOp.listAppend
---       (Expr.var "baseFlags")
---       (Expr.listLit [Expr.str "-O2", Expr.str "-Wall"]))
---   ]))
-
--- ── visual: parameterized config ──────────────────────────────────────────────
-
--- TODO[b7r6]: decide what to do with all of these `#eval` stanzas...
--- #eval render (Expr.lambda "arch" (Expr.importFile "types/Arch.dhall")
---   (Expr.lambda "debug" (Expr.builtin "Bool")
---     (Expr.record [
---       ("arch", Expr.var "arch"),
---       ("flags", Expr.ite (Expr.var "debug")
---         (Expr.listLit [Expr.str "-O0", Expr.str "-g"])
---         (Expr.listLit [Expr.str "-O2"]))])))
-
+-- TODO[b7r6]: !! decide what to do with all of these `#eval` stanzas !!
 
 end Continuity.Codegen.AST.Dhall

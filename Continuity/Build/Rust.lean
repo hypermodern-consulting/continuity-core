@@ -1,18 +1,42 @@
 import Continuity.Build.Dep
 import Continuity.Build.Vis
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                // continuity // build // rust
+set_option autoImplicit false
 
-   "The mall crowds were a faceless blur of motion."
-                                                                 — Count Zero
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "Mitchell's the man who made biochips work, essentially. The whole
+      biosoft industry. He took the basic concepts of biochip design
+      and turned them into something you could build on, something
+      that scaled. Before Mitchell, the theory was there but nobody
+      could make it stable enough for production. He found the rules
+      that made the stack hold together."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Build.Rs
+
+/-
+  Rust Build Rules.
+
+  `Binary` and `Library` targets with edition tracking, feature flags,
+  proc-macro support, and visibility control. The `Rs` abbreviation
+  keeps the rule union in `Build/Rule.lean` compact.
+-/
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                            // rust // edition
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 inductive Edition where
   | e2015 | e2018 | e2021 | e2024
   deriving Repr, DecidableEq, Inhabited
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // rust // binary
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure Binary where
   name      : String
@@ -26,6 +50,10 @@ structure Binary where
 
 def binary (name : String) (srcs : List String) (deps : List Dep) : Binary :=
   { name, srcs, deps }
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                         // rust // library
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure Library where
   name       : String

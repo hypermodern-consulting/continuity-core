@@ -3,34 +3,40 @@ import Continuity.Codegen.AST.Starlark.Render
 
 set_option autoImplicit false
 
--- TODO[b7r6]: this file is a masterclass in ignoring a better abstraction
--- in the same directory and slopping out an illegible, incorrect, useless
--- mess with negative value, fix it by creating a reasoanble builder...
-
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                           // continuity // codegen // starlark
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
-/-!
-  Toolchain .bzl file definitions as BzlFile values.
+      "Machine dreams hold a special vertigo." The construct was a lattice of
+      interconnection, each node feeding the next, each edge a contract between
+      subsystems that would either hold or fail. The toolchain itself — the
+      compilation from source to executable — was the oldest kind of magic:
+      translation across levels of abstraction, from the abstract syntax tree
+      of the programmer's intent down to the register transfers of the silicon.
+      Every .bzl file was a contract. Every rule, a machine dream made manifest.
 
-  Each .bzl file under toolchains/ is defined here as a Lean term.
-  The Starlark renderer produces the text. When the bundled prelude
-  changes (adds a required field, renames a type), the fix is here —
-  one place, one rebuild, all .bzl files updated.
+                                                                     — Count Zero
 
-  Implementation bodies are raw Starlark strings. The surrounding
-  structure (loads, attrs, providers, rule declarations) is typed.
--/
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.Codegen.Build.BzlDefs
+
+/-
+  Toolchain `.bzl` file definitions as `BzlFile` values.
+
+  Each `.bzl` file under toolchains/ is defined here as a Lean term.
+  The starlark renderer produces the text. When the bundled prelude
+  changes (adds a required field, renames a type), the fix is here —
+  one place, one rebuild, all `.bzl` files updated.
+
+  Implementation bodies are raw starlark strings. The surrounding
+  structure (loads, attrs, providers, rule declarations) is typed.
+-/
 
 open Continuity.Build
 open Continuity.Codegen.AST.Starlark
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                     // cxx.bzl
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                     // cxx.bzl
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def cxxImplBody : String :=
   "    \"\"\"\n" ++
@@ -201,17 +207,17 @@ def cxxBzl : BzlFile :=
             , ⟨"link_style", .string (some "static"), ""⟩
             , ⟨"_internal_tools", .raw "attrs.default_only(attrs.exec_dep(providers = [CxxInternalTools], default = \"prelude//cxx/tools:internal_tools\"))", ""⟩ ] } ] }
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                       // tests
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                       // tests
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
--- Verify the generated cxx.bzl compiles to valid Starlark
+-- verify the generated cxx.bzl compiles to valid starlark
 
 -- #eval (renderBzlFile cxxBzl).length
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                    // lean.bzl
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                    // lean.bzl
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def leanToolchainBody : List SStmt :=
   [ .comment "Read from config, fall back to attrs"
@@ -365,8 +371,8 @@ private def leanLibraryBody : List SStmt :=
   ]
 
 private def leanBinaryBody : List SStmt :=
-  -- This is the complex one — multi-file Lean compilation + linking.
-  -- Uses shell script via cmd_args to handle LEAN_PATH, file copying, etc.
+  -- this is the complex one — multi-file lean compilation + linking.
+  -- uses shell script via `cmd_args` to handle `LEAN_PATH`, file copying, etc.
   [ .assign "lean" (.call (.var "_get_lean") [] [])
   , .assign "leanc" (.call (.var "_get_leanc") [] [])
   , .assign "lean_lib_dir" (.call (.var "_get_lean_lib_dir") [] [])
@@ -520,7 +526,7 @@ private def leanBinaryBody : List SStmt :=
 def leanSFile : SFile :=
   { header := "# toolchains/lean.bzl — generated by continuity\n#\n# Lean 4 compilation rules. Builder → AST → Render."
   , items := [
-      -- Providers
+      -- providers
       .provider "LeanLibraryInfo"
         [("olean_dir", "Artifact | None, default = None"),
          ("c_dir", "Artifact | None, default = None"),
@@ -531,7 +537,7 @@ def leanSFile : SFile :=
          ("lean_lib_dir", "str | None, default = None"),
          ("lean_include_dir", "str | None, default = None")]
     , .blank
-    -- Config helpers
+    -- config helpers
     , leanGetConfig "lean" "lean" "lean"
         (some "\nlean compiler not configured.\nConfigure via Nix .buckconfig.local [lean] section.\n")
     , leanGetConfig "leanc" "lean" "leanc"
@@ -583,9 +589,9 @@ def leanSFile : SFile :=
 
 -- #eval (renderSFile leanSFile).length
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                    // rust.bzl
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                    // rust.bzl
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def rustToolchainBody : List SStmt :=
   [ .assign "rustc" (SExpr.readConfig "rust" "rustc" (.str "rustc"))
@@ -778,12 +784,11 @@ def rustSFile : SFile :=
         , ("features", .raw "attrs.list(attrs.string(), default = [])") ]
     ] }
 
-
 -- #eval (renderSFile rustSFile).length
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                 // haskell.bzl
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                // haskell.bzl
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def hsToolchainBody : List SStmt :=
   [ .assign "ghc" (SExpr.readConfig "haskell" "ghc" (.str "bin/ghc"))
@@ -808,7 +813,7 @@ private def hsToolchainBody : List SStmt :=
       .call (.var "HaskellPlatformInfo") [] [("name", .str "x86_64-linux")]
     ]) ]
 
-/-- common ghc setup: cmd with mandatory flags, package_db, extensions, packages. -/
+-- common `GHC` setup: `cmd` with mandatory flags, `package_db`, extensions, packages.
 private def hsGhcSetup (cmdVar : String) (addLink : Bool) : List SStmt :=
   [ .assign cmdVar (.call (.var "cmd_args") [.list [.var "ghc"]] [])
   , .expr (.methodCall (.var cmdVar) "add" [.str "-package-env=-"] [])
@@ -827,7 +832,7 @@ private def hsGhcSetup (cmdVar : String) (addLink : Bool) : List SStmt :=
     ]
   ]
 
-/-- collect deps from HaskellLibraryInfo. -/
+-- collect deps from `HaskellLibraryInfo`.
 private def hsCollectDeps : List SStmt :=
   [ .assign "dep_hi_dirs" (.list [])
   , .assign "dep_libs" (.list [])
@@ -852,7 +857,7 @@ private def hsCollectDeps : List SStmt :=
     ]
   ]
 
-/-- Add dep hi dirs as -i flags and source/object deps. -/
+-- add dep `hi` dirs as `-i` flags and source/object deps.
 private def hsAddDeps (cmdVar : String) : List SStmt :=
   [ .forStmt "hi_d" (.var "dep_hi_dirs") [
       .expr (.methodCall (.var cmdVar) "add"
@@ -1272,9 +1277,9 @@ def haskellSFile : SFile :=
 
 -- #eval (renderSFile haskellSFile).length
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                      // nv.bzl
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                      // nv.bzl
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def nvToolchainBody : List SStmt :=
   [ .assign "nvidia_sdk_path" (SExpr.readConfig "nv" "nvidia_sdk_path" (SExpr.ctxAttr "nvidia_sdk_path"))
@@ -1289,7 +1294,7 @@ private def nvToolchainBody : List SStmt :=
         ("nvidia_sdk_lib", .var "nvidia_sdk_lib"),
         ("nv_archs", SExpr.ctxAttr "nv_archs") ] ]) ]
 
-/-- config reads shared by nv_binary and nv_library. -/
+-- config reads shared by `nv_binary` and `nv_library`.
 private def nvConfigReads : List SStmt :=
   [ .comment "Validate CUDA toolchain"
   , .assign "clang" (SExpr.readConfigOpt "nv" "clang")
@@ -1309,7 +1314,7 @@ private def nvConfigReads : List SStmt :=
   , .assign "nv_archs" (.methodCall (.var "nv_archs_str") "split" [.str ","] [])
   ]
 
-/-- compile flags construction shared by nv_binary and nv_library. -/
+-- compile flags construction shared by `nv_binary` and `nv_library`.
 private def nvCompileFlags (std : String) : List SStmt :=
   [ .assign "compile_flags" (.list [
       .str "-x", .str "cuda",
@@ -1341,7 +1346,7 @@ private def nvCompileFlags (std : String) : List SStmt :=
     ])] []
   ]
 
-/-- Compile loop: compile each source to .o -/
+-- compile loop: compile each source to `.o`.
 private def nvCompileLoop : List SStmt :=
   [ .assign "objects" (.list [])
   , .forStmt "src" (SExpr.ctxAttr "srcs") [
@@ -1476,9 +1481,9 @@ def nvSFile : SFile :=
 
 -- #eval (renderSFile nvSFile).length
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                              // purescript.bzl
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                             // purescript.bzl
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def psToolchainBody : List SStmt :=
   [ .assign "purs" (SExpr.readConfig "purescript" "purs" (SExpr.ctxAttr "purs"))
@@ -1584,7 +1589,7 @@ def purescriptSFile : SFile :=
          ("spago", "str | None, default = None"),
          ("node", "str | None, default = None")]
     , .blank
-    -- Config helpers with validation
+    -- config helpers with validation
     , .funcDef "_get_purs" [] (some "str") (some "Get purs from config.")
         [ .assign "path" (SExpr.readConfigOpt "purescript" "purs")
         , .ifStmt [(.cmp "==" (.var "path") .none,
@@ -1631,11 +1636,11 @@ def purescriptSFile : SFile :=
 
 -- #eval (renderSFile purescriptSFile).length
 
-/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                                // all // files
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                // all // files
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
--- TODO[b7r6]: !! this is pretty clearly not the same list of files as dhall !!
+-- TODO[b7r6]: !! this is not the same list of files as `Dhall` — reconcile !!
 
 def bzlFiles : List (String × String) :=
   [ ("toolchains/cxx.bzl", renderBzlFile cxxBzl)

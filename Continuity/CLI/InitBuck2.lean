@@ -4,50 +4,69 @@ import Continuity.Codegen.AST.Dhall.Ast
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                     // continuity // init-buck2
-                                                                  initbuck2.lean
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
+      "A few drops of rain blew into her face. Smell of rain and wet earth.
+      She looked down at the foundations that had been poured before
+      anyone understood what the structure would become. You start with
+      what you know and scaffold upward — tool on tool, rule on rule —
+      until the system compiles itself into being. Configuration files
+      are the bones of any build; without them, the code is just text.
+
+      Her father had taught her that. He'd been a builder in the years
+      before the war, when things were still made by hand. 'You lay the
+      formwork first,' he'd say, 'then you pour.'"
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 namespace Continuity.CLI.InitBuck2
+
+/-
+  Buck2 workspace initializer.
+
+  Reads a Dhall specification file, extracts toolchain paths,
+  and generates the scaffolding files needed to build with `Buck2`:
+  `.buckroot`, `.buckconfig`, `toolchains/BUCK`, and optional
+  language-specific `toolchains/.bzl` files.
+-/
 
 open Continuity.Codegen.AST.Dhall (Expr)
 open Continuity.Codec.Dhall (parse)
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // spec extraction
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                           // spec extraction
-   ════════════════════════════════════════════════════════════════════════════════ -/
-
-/-- Get a string field from a record expression: { key = "value" } -/
+-- get a string field from a record expression: { key = "value" }
 def getField (e : Expr) (key : String) : Option Expr :=
   match e with
   | .record fields => fields.find? (fun (k, _) => k == key) |>.map Prod.snd
   | _ => none
 
-/-- Unwrap Some(x) → some x, None → none -/
+-- unwrap `Some(x)` → `some x`, `None` → `none`
 def unwrapOptional (e : Expr) : Option Expr :=
   match e with
   | .some v => some v
   | .none _ => none
-  | other   => some other  -- treat bare records as present
+  | other   => some other
 
-/-- Extract a string from Expr.text -/
+-- extract a string from `Expr.text`
 def getString (e : Expr) : Option String :=
   match e with
   | .text s => some s
   | _ => none
 
-/-- Get a nested string: spec.section.field -/
+-- get a nested string: spec.section.field
 def getNestedString (spec : Expr) (sect fld : String) : Option String := do
   let sectionExpr ← getField spec sect
   let inner ← unwrapOptional sectionExpr
   let fieldExpr ← getField inner fld
   getString fieldExpr
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                          // buck2 generation
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // buck2 generation
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure ToolPaths where
   leanRoot : Option String := none
@@ -131,21 +150,11 @@ def generateBuckconfig (tools : ToolPaths) : String :=
 def toolchainsBuck : String :=
   "load(\"@prelude//toolchains:demo.bzl\", \"system_demo_toolchains\")\nsystem_demo_toolchains()\n"
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // lean.bzl
-   ════════════════════════════════════════════════════════════════════════════════ -/
-
--- lean.bzl is read from the file system at runtime (toolchains/lean.bzl in
--- the continuity source tree). We embed a reference, not the content.
-
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                // entry point
-   ════════════════════════════════════════════════════════════════════════════════ -/
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                // entry point
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def initBuck2 (specPath targetDir : String) : IO Unit := do
-  -- Read and parse spec
   let specContent ← IO.FS.readFile specPath
   let spec ← match parse specContent with
     | some e => pure e
@@ -153,7 +162,6 @@ def initBuck2 (specPath targetDir : String) : IO Unit := do
 
   let tools := extractTools spec
 
-  -- Report
   IO.println s!"continuity init-buck2"
   IO.println s!"  spec: {specPath}"
   IO.println s!"  target: {targetDir}"
@@ -164,28 +172,25 @@ def initBuck2 (specPath targetDir : String) : IO Unit := do
   if tools.nvcc.isSome then IO.println s!"  ✓ nv: {tools.nvcc.get!}"
   if tools.reapiEndpoint.isSome then IO.println s!"  ✓ reapi: {tools.reapiEndpoint.get!}"
 
-  -- Write scaffolding
   IO.FS.createDirAll (targetDir ++ "/toolchains")
 
   IO.FS.writeFile (targetDir ++ "/.buckroot") ""
   IO.FS.writeFile (targetDir ++ "/.buckconfig") (generateBuckconfig tools)
   IO.FS.writeFile (targetDir ++ "/toolchains/BUCK") toolchainsBuck
 
-  -- Copy toolchain rules from our own toolchains if configured
+  -- lean.bzl is read from the file system at runtime (toolchains/lean.bzl
+  -- in the continuity source tree). we embed a reference, not the content.
   if tools.leanRoot.isSome then
-    -- Try to read lean.bzl from adjacent to the binary
     let leanBzl ← IO.FS.readFile "toolchains/lean.bzl" <|>
                    pure "-- lean.bzl not found; copy from continuity/toolchains/lean.bzl\n"
     IO.FS.writeFile (targetDir ++ "/toolchains/lean.bzl") leanBzl
 
-  -- Copy cuda.bzl if NVIDIA is configured
   if tools.nvcc.isSome then
     let cudaBzl ← IO.FS.readFile "toolchains/cuda.bzl" <|>
                    pure "-- cuda.bzl not found; copy from continuity/toolchains/cuda.bzl
 "
     IO.FS.writeFile (targetDir ++ "/toolchains/cuda.bzl") cudaBzl
 
-  -- .gitignore
   let gitignore := "buck-out\n.buckroot\n"
   IO.FS.writeFile (targetDir ++ "/.gitignore") gitignore
 

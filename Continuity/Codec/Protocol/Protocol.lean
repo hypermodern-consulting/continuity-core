@@ -3,9 +3,37 @@ import Continuity.Codec.Core.Bytes
 
 set_option autoImplicit false
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "He was a specialist in the extraction of top executives
+      and research people. He maintained a careful library of
+      protocol masks, each one a precise frame for a specific
+      class of operation, each one tested against the security
+      lattice that interlocked across his field of work. The
+      extraction itself was almost secondary: what mattered was
+      the choice of interface, the clean fit between the target's
+      shape and the codec you'd selected to carry it out."
+
+                                                                    — Count Zero
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
 namespace Continuity.Codec.Protocol.Protocol
 
+/-
+  Protocol framing and length-codec primitives.
+
+  Defines `Frame`, `LengthCodec`, and `BoundedFrame` as the
+  building blocks for network protocol parsing. Wire-format
+  length codecs for `Git` pkt-line, `Nix` daemon, and `Zmtp`
+  3.x are provided as concrete instances.
+-/
+
 open Continuity.Codec.Core.Box Continuity.Codec.Core.Bytes
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                            // core // frame
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 @[ext] structure Frame where
   payload : Bytes
@@ -13,6 +41,10 @@ open Continuity.Codec.Core.Box Continuity.Codec.Core.Bytes
 
 def Frame.flush : Frame := ⟨ByteArray.empty⟩
 def Frame.isFlush (f : Frame) : Bool := f.payload.size == 0
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                           // core // codec
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 structure LengthCodec where
   fixedSize : Nat
@@ -28,7 +60,11 @@ structure BoundedFrame (codec : LengthCodec) where
   frame : Frame
   bound : frame.payload.size ≤ codec.maxPayload
 
--- Hex encoding for Git pkt-line
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                       // encoding // hex
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+-- hex encoding for `Git` `pkt-line`
 def toHexChar (n : Nat) : UInt8 :=
   if n < 10 then (48 + n).toUInt8 else (87 + n).toUInt8
 
@@ -47,21 +83,14 @@ theorem fromHexChar_toHexChar (n : Nat) (h : n < 16) :
   | 12, _ => rfl | 13, _ => rfl | 14, _ => rfl | 15, _ => rfl
   | n + 16, h => nomatch (Nat.not_lt.mpr (Nat.le_add_left 16 n) h)
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                // encoding // wire-format
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 def gitEncodeLength (payloadLen : Nat) : Bytes :=
   let totalLen := payloadLen + 4
   [toHexChar ((totalLen / 4096) % 16), toHexChar ((totalLen / 256) % 16),
    toHexChar ((totalLen / 16) % 16), toHexChar (totalLen % 16)].toByteArray
-
-def nixEncodeLength (n : Nat) : Bytes := u64le.serialize n.toUInt64
-
-def nixDecodeLength (bs : Bytes) : Option (Nat × Nat) :=
-  match u64le.parse bs with
-  | .ok len _ => some (len.toNat, 8)
-  | .fail => none
-
-def zmtpEncodeLength (n : Nat) : Bytes :=
-  if n < 255 then ⟨#[n.toUInt8]⟩
-  else ⟨#[0xFF]⟩ ++ u64le.serialize n.toUInt64
 
 def gitDecodeLength (bs : Bytes) : Option (Nat × Nat) :=
   if bs.size >= 4 then
@@ -74,5 +103,16 @@ def gitDecodeLength (bs : Bytes) : Option (Nat × Nat) :=
       else none
     | _, _, _, _ => none
   else none
+
+def nixEncodeLength (n : Nat) : Bytes := u64le.serialize n.toUInt64
+
+def nixDecodeLength (bs : Bytes) : Option (Nat × Nat) :=
+  match u64le.parse bs with
+  | .ok len _ => some (len.toNat, 8)
+  | .fail => none
+
+def zmtpEncodeLength (n : Nat) : Bytes :=
+  if n < 255 then ⟨#[n.toUInt8]⟩
+  else ⟨#[0xFF]⟩ ++ u64le.serialize n.toUInt64
 
 end Continuity.Codec.Protocol.Protocol

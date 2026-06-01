@@ -4,9 +4,30 @@ import Continuity.Codegen.AST.Cpp.Render
 
 set_option autoImplicit false
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      "Mitchell's the man who made biochips work."
+
+                                                                      — Count Zero
+
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
 namespace Continuity.Codegen.Codec
 
+/-
+  C++ codegen from `CodecSpec` module descriptions.
+
+  Each protocol module (`Nix`, `Protobuf`, `Git`, ...) emits a header file
+  with typed struct definitions, parse/serialize stubs, enum classes, and
+  constexpr constants. The stubs link to verified `Lean` implementations
+  for production builds.
+-/
+
 open Continuity.Codegen.AST.Cpp
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                                // mapping
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 private def wireTypeToCType : WireType → CType
   | .u8 => CType.intType true 8
@@ -39,6 +60,10 @@ private partial def hexStr (n : Nat) : String :=
         go (n / 16) (s!"{c}" ++ acc)
     "0x" ++ go n ""
 
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // declarations
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 private def constDecl (c : ConstSpec) : CDecl :=
   let typStr := match c.wireType with
     | .u64le | .u64be => "uint64_t" | .u32le | .u32be => "uint32_t"
@@ -67,6 +92,10 @@ private def serializeFnDecl (s : StructSpec) : CDecl :=
     [⟨CType.ref (CType.const (CType.named s.name)), "val"⟩]
     [CStmt.comment "Generated stub — implementation links to verified Lean",
      CStmt.ret (CExpr.initList [])]
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                          // module // emit
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def moduleToHpp (m : CodecModule) : CFile :=
   let includes := [
