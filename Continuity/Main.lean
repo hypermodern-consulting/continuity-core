@@ -52,7 +52,8 @@ def cmdGenerate (outDir : String) : IO Unit := do
     IO.FS.createDirAll dir
     IO.FS.writeFile fullPath content
     IO.println s!"  wrote {path}"
-  let total := preludeFiles.length + cppCodecFiles.length + hsCodecFiles.length
+  let total := preludeFiles.length + cppCodecFiles.length + hsCodecFiles.length +
+    hsPrimitivesFiles.length + cppPrimitivesFiles.length
 
   -- `Grade` module (Haskell + C++)
   let gradeHsPath := s!"{outDir}/grade/Continuity/Grade.hs"
@@ -66,6 +67,14 @@ def cmdGenerate (outDir : String) : IO Unit := do
   IO.FS.createDirAll gradeCppDir
   IO.FS.writeFile gradeCppPath Continuity.Codegen.Algebra.Effect.emitCppGradeEnum
   IO.println s!"  wrote grade/continuity_grade.hpp"
+
+  -- `Grade` primitives (Haskell graded monad + QualifiedDo)
+  for (path, content) in hsPrimitivesFiles do
+    let fullPath := s!"{outDir}/{path}"
+    let dir := System.FilePath.mk fullPath |>.parent |>.getD (System.FilePath.mk ".")
+    IO.FS.createDirAll dir
+    IO.FS.writeFile fullPath content
+    IO.println s!"  wrote {path}"
 
   -- `Starlark` toolchain files (generated from Lean)
   let starlarkOut := starlarkFiles allToolchains
@@ -108,6 +117,10 @@ def cmdGenerate (outDir : String) : IO Unit := do
     manifest := Continuity.Nix.Derivation.writeLPStr manifest path
     manifest := Continuity.Nix.Derivation.writeLPStr manifest content
   for (path, content) in hsCodecFiles do
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
+
+  for (path, content) in hsPrimitivesFiles do
     manifest := Continuity.Nix.Derivation.writeLPStr manifest path
     manifest := Continuity.Nix.Derivation.writeLPStr manifest content
 

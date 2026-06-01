@@ -7,6 +7,9 @@ import Continuity.Codegen.AST.Dhall.Render
 import Continuity.Codegen.AST.Dhall.Build
 import Continuity.Codegen.AST.Starlark.Ast
 import Continuity.Codegen.AST.Starlark.Render
+import Continuity.Codegen.AST.Cpp.Primitives
+import Continuity.Codegen.AST.Haskell.Primitives
+import Continuity.Codegen.AST.Haskell.Primitives
 
 set_option autoImplicit false
 
@@ -148,5 +151,26 @@ def bzlFiles : List (String × String) := allBzlFiles
 def allStarlarkFiles (config : Continuity.Codegen.Build.Starlark.ToolchainConfig) :
     List (String × String) :=
   deriveToolchainsStarlark config ++ deriveBzlFiles
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                        // c++ // primitives
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def emitCppPrimitives : String :=
+  Continuity.Codegen.AST.Cpp.Primitives.emitCppPrimitives
+
+def cppPrimitivesFiles : List (String × String) :=
+  [("primitive/continuity_primitives.hpp", emitCppPrimitives)]
+
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---                                                    // haskell // primitives
+--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def hsPrimitivesFiles : List (String × String) :=
+  [ ("grade/Continuity/Grade/Primitives.hs",
+     Continuity.Codegen.AST.Haskell.Primitives.emitHsPrimitives)
+  , ("grade/Control/Grade/Do.hs",
+     Continuity.Codegen.AST.Haskell.Primitives.emitHsGradeDo)
+  ]
 
 end Continuity.Codegen.Derive.Build

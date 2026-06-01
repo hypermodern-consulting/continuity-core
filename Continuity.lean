@@ -8,6 +8,7 @@ import Continuity.Codegen.AST.Haskell.Build
 import Continuity.Codegen.AST.Cpp.Ast
 import Continuity.Codegen.AST.Cpp.Render
 import Continuity.Codegen.AST.Cpp.Build
+import Continuity.Codegen.AST.Haskell.Primitives
 import Continuity.Codegen.AST.Starlark.Ast
 import Continuity.Codegen.AST.Starlark.Render
 import Continuity.Codegen.AST.Starlark.Builder
