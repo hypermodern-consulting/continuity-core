@@ -1,9 +1,6 @@
 import Continuity.Nix.Derivation
-import Continuity.Codegen.Build.ToDhall
-import Continuity.Codegen.Build.ToStarlark
-import Continuity.Codegen.Build.BzlDefs
-import Continuity.Codegen.Codec.ToCpp
-import Continuity.Codegen.Codec.ToHaskell
+import Continuity.Codegen.Derive.Build
+import Continuity.Codegen.Derive.Codec
 import Continuity.CLI.InitBuck2
 import Continuity.Codegen.Algebra.Effect
 import Continuity.Crypto.SHA256
@@ -29,10 +26,8 @@ set_option autoImplicit false
 
 namespace Continuity
 
-open Continuity.Codegen.Build
-open Continuity.Codegen.Build.Starlark
-open Continuity.Codegen.Build.BzlDefs
-open Continuity.Codegen.Codec
+open Continuity.Codegen.Derive.Build
+open Continuity.Codegen.Derive.Codec
 open Continuity.Codegen.AST.Dhall
 open Continuity.Codegen.AST.Starlark
 open Continuity.CLI.InitBuck2
@@ -73,8 +68,7 @@ def cmdGenerate (outDir : String) : IO Unit := do
   IO.println s!"  wrote grade/continuity_grade.hpp"
 
   -- `Starlark` toolchain files (generated from Lean)
-  let starlarkOut := Continuity.Codegen.Build.Starlark.starlarkFiles
-    Continuity.Codegen.Build.Starlark.allToolchains
+  let starlarkOut := starlarkFiles allToolchains
   for (path, content) in starlarkOut do
     let fullPath := s!"{outDir}/{path}"
     let dir := System.FilePath.mk fullPath |>.parent |>.getD (System.FilePath.mk ".")
@@ -83,7 +77,7 @@ def cmdGenerate (outDir : String) : IO Unit := do
     IO.println s!"  wrote {path}"
 
   -- `.bzl` rule files (generated from `BzlFile` definitions in Lean)
-  for (path, content) in Continuity.Codegen.Build.BzlDefs.bzlFiles do
+  for (path, content) in bzlFiles do
     let fullPath := s!"{outDir}/{path}"
     let dir := System.FilePath.mk fullPath |>.parent |>.getD (System.FilePath.mk ".")
     IO.FS.createDirAll dir

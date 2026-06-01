@@ -19,11 +19,9 @@ set_option autoImplicit false
 namespace Continuity.Codegen.AST.Starlark
 
 /-
-  Starlark renderer — the ONLY place `.bzl` / `BUCK` text is assembled.
+  Starlark renderer for AST-based `.bzl` files.
 
-  Two entry points: `renderSFile` for AST-based `.bzl` files,
-  `renderBuckFile` for toolchain `BUCK` files. Generated files
-  should be parseable by `buildifier` without changes.
+  Generated files should be parseable by `buildifier` without changes.
 -/
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -43,76 +41,6 @@ private def escapeStr (s : String) : String :=
   ) ""
 
 private def renderStrLit (s : String) : String := s!"\"{escapeStr s}\""
-
--- render a list of strings as a starlark list literal.
-private def renderStrList (items : List String) : String :=
-  if items.isEmpty then "[]"
-  else
-    let inner := String.intercalate ", " (items.map renderStrLit)
-    s!"[{inner}]"
-
--- render a list of strings as a multi-line starlark list literal.
-private def renderStrListMulti (indent : Nat) (items : List String) : String :=
-  if items.isEmpty then "[]"
-  else if items.length ≤ 3 then renderStrList items
-  else
-    let lines := items.map fun s => s!"{pad (indent + 4)}{renderStrLit s},"
-    s!"[\n{String.intercalate "\n" lines}\n{pad indent}]"
-
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                                       // load
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-structure Load where
-  bzl     : String
-  symbols : List String
-  deriving Repr, Inhabited
-
-private def renderLoad (l : Load) : String :=
-  let syms := String.intercalate ", " (l.symbols.map renderStrLit)
-  s!"load({renderStrLit l.bzl}, {syms})"
-
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                                        // BUCK
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
--- a toolchain instantiation in a `BUCK` file.
-structure ToolchainCall where
-  ruleFunc   : String                      -- e.g. `"system_cxx_toolchain"`
-  name       : String                      -- e.g. `"cxx"`
-  kwargs     : List (String × String)      -- key-value pairs (already rendered)
-  visibility : List String := ["PUBLIC"]
-  deriving Repr, Inhabited
-
--- render a single toolchain call in a `BUCK` file.
-def renderToolchainCall (t : ToolchainCall) : String :=
-  let vis := renderStrList t.visibility
-  let kwargLines := t.kwargs.map fun (k, v) => s!"    {k} = {v},"
-  
-  let allLines := [s!"    name = {renderStrLit t.name},"]
-    ++ kwargLines
-    ++ [s!"    visibility = {vis},"]
-    
-  s!"{t.ruleFunc}(\n{String.intercalate "\n" allLines}\n)"
-
--- a complete `BUCK` file for toolchains.
-structure BuckFile where
-  header  : String := ""
-  loads   : List Load := []
-  calls   : List ToolchainCall := []
-  deriving Repr, Inhabited
-
--- render a toolchains/BUCK file.
-def renderBuckFile (b : BuckFile) : String :=
-  let sections : List String := List.filter (· ≠ "") [
-    b.header,
-    (if b.loads.isEmpty then ""
-     else String.intercalate "\n" (b.loads.map renderLoad)),
-    (if b.calls.isEmpty then ""
-     else String.intercalate "\n\n" (b.calls.map renderToolchainCall))
-  ]
-  
-  String.intercalate "\n\n" sections ++ "\n"
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ---                                                             // AST // render
