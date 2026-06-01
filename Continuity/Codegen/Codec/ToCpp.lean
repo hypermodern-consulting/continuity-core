@@ -1,12 +1,12 @@
 import Continuity.Codegen.Codec.Spec
-import Continuity.Emit.Cpp.Ast
-import Continuity.Emit.Cpp.Render
+import Continuity.Codegen.AST.Cpp.Ast
+import Continuity.Codegen.AST.Cpp.Render
 
 set_option autoImplicit false
 
 namespace Continuity.Codegen.Codec
 
-open Continuity.Emit.Cpp
+open Continuity.Codegen.AST.Cpp
 
 private def wireTypeToCType : WireType → CType
   | .u8 => CType.intType true 8

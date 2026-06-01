@@ -1,20 +1,20 @@
-import Continuity.Derivation
+import Continuity.Nix.Derivation
 import Continuity.Codegen.Build.ToDhall
 import Continuity.Codegen.Build.ToStarlark
 import Continuity.Codegen.Build.BzlDefs
 import Continuity.Codegen.Codec.ToCpp
 import Continuity.Codegen.Codec.ToHaskell
-import Continuity.InitBuck2
-import Continuity.Codegen.Effect
+import Continuity.CLI.InitBuck2
+import Continuity.Codegen.Algebra.Effect
 import Continuity.Crypto.SHA256
 
 open Continuity.Codegen.Build
 open Continuity.Codegen.Build.Starlark
 open Continuity.Codegen.Build.BzlDefs
 open Continuity.Codegen.Codec
-open Continuity.Emit.Dhall
-open Continuity.Emit.Starlark
-open Continuity.InitBuck2
+open Continuity.Codegen.AST.Dhall
+open Continuity.Codegen.AST.Starlark
+open Continuity.CLI.InitBuck2
 
 def cmdGenerate (outDir : String) : IO Unit := do
   IO.println s!"Generating Continuity prelude → {outDir}/"
@@ -42,13 +42,13 @@ def cmdGenerate (outDir : String) : IO Unit := do
   let gradeHsPath := s!"{outDir}/grade/Continuity/Grade.hs"
   let gradeHsDir := System.FilePath.mk gradeHsPath |>.parent |>.getD (System.FilePath.mk ".")
   IO.FS.createDirAll gradeHsDir
-  IO.FS.writeFile gradeHsPath Continuity.Codegen.Effect.emitGradeModule
+  IO.FS.writeFile gradeHsPath Continuity.Codegen.Algebra.Effect.emitGradeModule
   IO.println s!"  wrote grade/Continuity/Grade.hs"
 
   let gradeCppPath := s!"{outDir}/grade/continuity_grade.hpp"
   let gradeCppDir := System.FilePath.mk gradeCppPath |>.parent |>.getD (System.FilePath.mk ".")
   IO.FS.createDirAll gradeCppDir
-  IO.FS.writeFile gradeCppPath Continuity.Codegen.Effect.emitCppGradeEnum
+  IO.FS.writeFile gradeCppPath Continuity.Codegen.Algebra.Effect.emitCppGradeEnum
   IO.println s!"  wrote grade/continuity_grade.hpp"
 
   -- Starlark toolchain files (generated from Lean)
@@ -87,14 +87,14 @@ def cmdGenerate (outDir : String) : IO Unit := do
   let mut manifest := ByteArray.empty
   for (path, expr) in preludeFiles do
     let content := render expr ++ "\n"
-    manifest := Continuity.Derivation.writeLPStr manifest path
-    manifest := Continuity.Derivation.writeLPStr manifest content
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
   for (path, content) in cppCodecFiles do
-    manifest := Continuity.Derivation.writeLPStr manifest path
-    manifest := Continuity.Derivation.writeLPStr manifest content
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
   for (path, content) in hsCodecFiles do
-    manifest := Continuity.Derivation.writeLPStr manifest path
-    manifest := Continuity.Derivation.writeLPStr manifest content
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest path
+    manifest := Continuity.Nix.Derivation.writeLPStr manifest content
 
   let h1 := Continuity.Crypto.SHA256.hashHex manifest
   IO.FS.writeFile (outDir ++ "/MANIFEST.sha256") (h1 ++ "\n")

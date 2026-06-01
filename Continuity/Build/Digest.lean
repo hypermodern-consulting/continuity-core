@@ -1,11 +1,10 @@
-import Continuity.Crypto
+import Continuity.Crypto.Core
 import Continuity.Crypto.SHA256
 
 set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                                // continuity // build // digest
-                                                                    digest.lean
+                                               // continuity // build // digest
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-!

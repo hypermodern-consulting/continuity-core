@@ -1,10 +1,11 @@
 import Continuity.Codec.Dhall.Lexer
-import Continuity.Emit.Dhall.Ast
-import Continuity.Emit.Dhall.Render
+import Continuity.Codegen.AST.Dhall.Ast
+import Continuity.Codegen.AST.Dhall.Render
+
+set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                                 // continuity // codec // dhall
-                                                                    parser.lean
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-!
@@ -30,12 +31,11 @@ import Continuity.Emit.Dhall.Render
 
 namespace Continuity.Codec.Dhall
 
-open Continuity.Emit.Dhall
+open Continuity.Codegen.AST.Dhall
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // parse monad
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                              // parse // monad
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-- Parse state: remaining tokens. Result: parsed value + remaining tokens, or failure. -/
 abbrev P (α : Type) := List Tok → Option (α × List Tok)
@@ -66,13 +66,13 @@ private def str : P String
   | _                => Option.none
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                         // recursive descent
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                        // recursive // descent
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 mutual
 
-/-- Parse an expression (top level). -/
+/-- parse an expression (top level). -/
 partial def parseExpr : P Expr
   | Tok.kLet :: ts      => parseLet ts
   | Tok.kLambda :: ts   => parseLambda ts
@@ -85,16 +85,19 @@ partial def parseExpr : P Expr
 /-- `let name (: ty)? = value in body` -/
 partial def parseLet (ts : List Tok) : Option (Expr × List Tok) := do
   let (name, ts) ← ident ts
-  -- optional type annotation
+
+-- optional type annotation
   let (ty, ts) ← match ts with
     | Tok.colon :: ts' => do
       let (t, ts'') ← parseExpr ts'
       pure (Option.some t, ts'')
     | _ => pure (Option.none, ts)
+
   let ((), ts) ← expect Tok.equals ts
   let (value, ts) ← parseExpr ts
   let ((), ts) ← expect Tok.kIn ts
   let (body, ts) ← parseExpr ts
+
   pure (Expr.letIn name ty value body, ts)
 
 /-- `λ(param : type) → body` -/
@@ -106,6 +109,7 @@ partial def parseLambda (ts : List Tok) : Option (Expr × List Tok) := do
   let ((), ts) ← expect Tok.rparen ts
   let ((), ts) ← expect Tok.arrow ts
   let (body, ts) ← parseExpr ts
+
   pure (Expr.lambda param paramTy body, ts)
 
 /-- `∀(param : type) → body` -/
@@ -117,6 +121,7 @@ partial def parseForall (ts : List Tok) : Option (Expr × List Tok) := do
   let ((), ts) ← expect Tok.rparen ts
   let ((), ts) ← expect Tok.arrow ts
   let (body, ts) ← parseExpr ts
+
   pure (Expr.forallE param paramTy body, ts)
 
 /-- `if cond then thenBranch else elseBranch` -/
@@ -126,18 +131,21 @@ partial def parseIf (ts : List Tok) : Option (Expr × List Tok) := do
   let (thn, ts) ← parseExpr ts
   let ((), ts) ← expect Tok.kElse ts
   let (els, ts) ← parseExpr ts
+  
   pure (Expr.ite cond thn els, ts)
 
 /-- `merge handler union` -/
 partial def parseMerge (ts : List Tok) : Option (Expr × List Tok) := do
   let (handler, ts) ← parseAtom ts
   let (union, ts) ← parseAtom ts
+  
   pure (Expr.merge handler union Option.none, ts)
 
 /-- `assert : expr` -/
 partial def parseAssert (ts : List Tok) : Option (Expr × List Tok) := do
   let ((), ts) ← expect Tok.colon ts
   let (body, ts) ← parseExpr ts
+  
   pure (Expr.assert body, ts)
 
 /-- Expression with optional type annotation: `expr : type` -/
@@ -149,19 +157,22 @@ partial def parseAnnot (ts : List Tok) : Option (Expr × List Tok) := do
     pure (Expr.annot e ty, ts'')
   | _ => pure (e, ts)
 
-/-- Application: one or more atoms left-associated.
+/-- application: one or more atoms left-associated.
     `f x y` = `app (app f x) y` -/
 partial def parseAppExpr (ts : List Tok) : Option (Expr × List Tok) := do
   let (first, ts) ← parseSelectExpr ts
+  
   let rec go (acc : Expr) (ts : List Tok) : Expr × List Tok :=
     match parseSelectExpr ts with
     | Option.some (arg, ts') => go (Expr.app acc arg) ts'
     | Option.none            => (acc, ts)
+    
   pure (go first ts)
 
-/-- Field selection: `expr.field1.field2` -/
+/-- field selection: `expr.field1.field2` -/
 partial def parseSelectExpr (ts : List Tok) : Option (Expr × List Tok) := do
   let (e, ts) ← parseAtom ts
+  
   let rec go (acc : Expr) (ts : List Tok) : Expr × List Tok :=
     match ts with
     | Tok.dot :: Tok.ident name :: ts' => go (Expr.field acc name) ts'
@@ -171,9 +182,10 @@ partial def parseSelectExpr (ts : List Tok) : Option (Expr × List Tok) := do
       | Option.some (names, ts'') => go (Expr.project acc names) ts''
       | Option.none => (acc, ts)
     | _ => (acc, ts)
+    
   pure (go e ts)
 
-/-- Parse a single atom. -/
+/-- parse a single atom. -/
 partial def parseAtom (ts : List Tok) : Option (Expr × List Tok) :=
   match ts with
   | Tok.nat n :: ts'       => Option.some (Expr.natural n, ts')
@@ -215,13 +227,15 @@ partial def parseAtom (ts : List Tok) : Option (Expr × List Tok) :=
 
   | _ => Option.none
 
-/-- Parse record literal `{ name = val, ... }` or record type `{ name : ty, ... }` -/
+/-- parse record literal `{ name = val, ... }` or record type `{ name : ty, ... }` -/
 partial def parseRecordish (ts : List Tok) : Option (Expr × List Tok) :=
   match ts with
   -- empty record: {=}
   | Tok.equals :: Tok.rbrace :: ts' => Option.some (Expr.record [], ts')
+  
   -- empty record type: {}
   | Tok.rbrace :: ts' => Option.some (Expr.recordType [], ts')
+  
   -- peek at first field to decide record vs record type
   | Tok.ident name :: Tok.equals :: ts' => do
     -- record literal
@@ -235,7 +249,7 @@ partial def parseRecordish (ts : List Tok) : Option (Expr × List Tok) :=
     pure (Expr.recordType ((name, ty) :: rest), ts''')
   | _ => Option.none
 
-/-- Parse remaining record literal fields: `, name = val` until `}` -/
+/-- parse remaining record literal fields: `, name = val` until `}` -/
 partial def parseRecordFields (ts : List Tok) : Option (List (String × Expr) × List Tok) :=
   match ts with
   | Tok.rbrace :: ts' => Option.some ([], ts')
@@ -255,6 +269,8 @@ partial def parseRecordTypeFields (ts : List Tok) : Option (List (String × Expr
     pure ((name, ty) :: rest, ts''')
   | _ => Option.none
 
+-- TODO[b7r6]: this is too nested for a language without a formatter...
+
 /-- Parse list: items until `]`, optional type annotation -/
 partial def parseList (ts : List Tok) : Option (Expr × List Tok) :=
   match ts with
@@ -270,7 +286,7 @@ partial def parseList (ts : List Tok) : Option (Expr × List Tok) :=
     let (rest, ts'') ← parseListTail ts'
     pure (Expr.list (first :: rest) Option.none, ts'')
 
-/-- Parse remaining list items: `, expr` until `]` -/
+/-- parse remaining list items: `, expr` until `]` -/
 partial def parseListTail (ts : List Tok) : Option (List Expr × List Tok) :=
   match ts with
   | Tok.rbracket :: ts' => Option.some ([], ts')
@@ -280,16 +296,19 @@ partial def parseListTail (ts : List Tok) : Option (List Expr × List Tok) :=
     pure (e :: rest, ts''')
   | _ => Option.none
 
-/-- Parse union type: `< A | B : T | C >` with optional `.tag` -/
+/-- parse union type: `< A | B : T | C >` with optional `.tag` -/
 partial def parseUnion (ts : List Tok) : Option (Expr × List Tok) := do
   let (alts, ts) ← parseUnionAlts ts
+
   -- check for `.tag` (union value)
   match ts with
   | Tok.dot :: Tok.ident tag :: ts' =>
     Option.some (Expr.unionVal "" alts tag Option.none, ts')
   | _ => Option.some (Expr.unionType alts, ts)
 
-/-- Parse union alternatives: `A | B : T | C` until `>` -/
+-- TODO[b7r6]: this is too nested for a language without a formatter...
+
+/-- parse union alternatives: `A | B : T | C` until `>` -/
 partial def parseUnionAlts (ts : List Tok) : Option (List (String × Option Expr) × List Tok) :=
   match ts with
   | Tok.rangle :: ts' => Option.some ([], ts')
@@ -309,7 +328,7 @@ partial def parseUnionAlts (ts : List Tok) : Option (List (String × Option Expr
     | _ => Option.none
   | _ => Option.none
 
-/-- Parse comma-separated identifiers until `}` -/
+/-- parse comma-separated identifiers until `}` -/
 partial def parseIdentList (ts : List Tok) : Option (List String × List Tok) :=
   match ts with
   | Tok.rbrace :: ts' => Option.some ([], ts')
@@ -321,56 +340,59 @@ partial def parseIdentList (ts : List Tok) : Option (List String × List Tok) :=
 
 end
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // public API
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                               // public // api
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-- Parse a Dhall expression from a string. -/
 def parse (input : String) : Option Expr := do
   let tokens := tokenize input.toUTF8
-  let (expr, remaining) ← parseExpr tokens
+
+  -- TODO[b7r6]: !! `remaining` sounds important !!
+  let (expr, _) ← parseExpr tokens
+  
   -- allow trailing tokens (e.g. unconsumed closing braces in top-level let chains)
   pure expr
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                                                        // tests
-   ════════════════════════════════════════════════════════════════════════════════ -/
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
--- atoms
-#eval parse "42"
-#eval parse "\"hello\""
-#eval parse "True"
-#eval parse "Some 42"
+-- TODO[b7r6]: !! write real tests !!
 
--- record
-#eval parse "{ name = \"hello\", version = 1 }"
+-- -- atoms
+-- #eval parse "42"
+-- #eval parse "\"hello\""
+-- #eval parse "True"
+-- #eval parse "Some 42"
 
--- list
-#eval parse "[ 1, 2, 3 ]"
+-- -- record
+-- #eval parse "{ name = \"hello\", version = 1 }"
 
--- let chain
-#eval parse "let x = 42 in x"
+-- -- list
+-- #eval parse "[ 1, 2, 3 ]"
 
--- lambda
-#eval parse "λ(x : Natural) → x"
+-- -- let chain
+-- #eval parse "let x = 42 in x"
 
--- union type
-#eval parse "< A | B | C >"
+-- -- lambda
+-- #eval parse "λ(x : Natural) → x"
 
--- field access
-#eval parse "config.name"
+-- -- union type
+-- #eval parse "< A | B | C >"
 
--- the money shot: parse our own emitted Dhall
-#eval do
-  let original := Continuity.Emit.Dhall.Expr.record [
-    ("name", Continuity.Emit.Dhall.Expr.str "hello"),
-    ("version", Continuity.Emit.Dhall.Expr.natural 1)
-  ]
-  let rendered := Continuity.Emit.Dhall.render original
-  let parsed ← parse rendered
-  pure (repr parsed)
+-- -- field access
+-- #eval parse "config.name"
+
+-- -- the money shot: parse our own emitted Dhall
+-- #eval do
+--   let original := Continuity.Codegen.AST.Dhall.Expr.record [
+--     ("name", Continuity.Codegen.AST.Dhall.Expr.str "hello"),
+--     ("version", Continuity.Codegen.AST.Dhall.Expr.natural 1)
+--   ]
+--   let rendered := Continuity.Codegen.AST.Dhall.render original
+--   let parsed ← parse rendered
+--   pure (repr parsed)
 
 
 end Continuity.Codec.Dhall

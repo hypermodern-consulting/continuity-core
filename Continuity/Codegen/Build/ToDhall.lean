@@ -6,13 +6,14 @@ import Continuity.Build.Toolchain
 import Continuity.Build.Cxx
 import Continuity.Build.Library
 import Continuity.Build.BzlFile
-import Continuity.Emit.Dhall.Ast
-import Continuity.Emit.Dhall.Render
-import Continuity.Emit.Dhall.Build
+import Continuity.Codegen.AST.Dhall.Ast
+import Continuity.Codegen.AST.Dhall.Render
+import Continuity.Codegen.AST.Dhall.Build
+
+set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                                         // continuity // codegen // build // dhall
-                                                                    to-dhall.lean
+                                                   // codegen // build // dhall
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-!
@@ -33,12 +34,11 @@ import Continuity.Emit.Dhall.Build
 
 namespace Continuity.Codegen.Build
 
-open Continuity.Emit.Dhall
+open Continuity.Codegen.AST.Dhall
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                              // helpers
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                                     // helpers
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-! helpers for generating common Dhall patterns from constructor lists. -/
 
@@ -49,6 +49,7 @@ def emitEnum (names : List String) : Expr :=
 /-- Generate a Dhall merge expression that maps constructors to strings.
     `λ(x : T) → merge { c1 = "s1", c2 = "s2", ... } x` -/
 def emitRenderFn (paramName : String) (typeName : String)
+
     (mapping : List (String × String)) : Expr :=
   Expr.lambda paramName (Expr.var typeName)
     (Expr.merge
@@ -59,6 +60,7 @@ def emitRenderFn (paramName : String) (typeName : String)
 /-- Generate a Dhall merge that maps constructors to `Optional Text`.
     Constructors mapping to "" produce `None Text`, others produce `Some "..."`. -/
 def emitOptionalRenderFn (paramName : String) (typeName : String)
+
     (mapping : List (String × String)) : Expr :=
   Expr.lambda paramName (Expr.var typeName)
     (Expr.merge
@@ -70,6 +72,7 @@ def emitOptionalRenderFn (paramName : String) (typeName : String)
 
 /-- Generate a Dhall merge that maps constructors to Bool (true if match). -/
 def emitPredicate (paramName : String) (typeName : String)
+
     (trueCtors : List String) (allCtors : List String) : Expr :=
   Expr.lambda paramName (Expr.var typeName)
     (Expr.merge
@@ -79,9 +82,9 @@ def emitPredicate (paramName : String) (typeName : String)
       Option.none)
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                       // constructor tables
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                       // constructor // tables
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-! these tables mirror the Lean inductives. if you add a constructor to
     the Lean type, add it here. this is the price of not using Lean
@@ -126,9 +129,9 @@ def cpuNames    : List String := cpuTable.map Prod.fst
 def gpuNames    : List String := gpuTable.map Prod.fst
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                          // triple emission
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                          // triple // emission
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-- Emit a Dhall triple record value from a Lean Triple. -/
 def emitTriple (t : Continuity.Build.Triple) : Expr :=
@@ -144,10 +147,9 @@ def emitTriple (t : Continuity.Build.Triple) : Expr :=
 def emitNamedTriple (name : String) (t : Continuity.Build.Triple) : String × Option Expr × Expr :=
   (name, Option.some (Expr.var "Triple"), emitTriple t)
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                       // Triple.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                    // `Triple.dhall` // module
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-- Generate the complete Triple.dhall module. -/
 def emitTripleDhall : Expr :=
@@ -200,6 +202,7 @@ def emitTripleDhall : Expr :=
     field "Cpu"     (Expr.var "Cpu")
     field "Gpu"     (Expr.var "Gpu")
     field "Triple"  (Expr.var "Triple")
+    
     -- render functions
     field "renderArch"   (Expr.var "renderArch")
     field "renderVendor" (Expr.var "renderVendor")
@@ -209,6 +212,7 @@ def emitTripleDhall : Expr :=
     field "renderGpu"    (Expr.var "renderGpu")
     field "abiIsNone"    (Expr.var "abiIsNone")
     field "gpuIsNone"    (Expr.var "gpuIsNone")
+    
     -- common triples
     field "x86_64-linux-gnu"     (Expr.var "x86_64-linux-gnu")
     field "aarch64-linux-gnu"    (Expr.var "aarch64-linux-gnu")
@@ -225,21 +229,9 @@ def emitTripleDhall : Expr :=
 
   Expr.letChain allBindings exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                                       // tests
-   ════════════════════════════════════════════════════════════════════════════════ -/
-
--- the money shot: does the loop close?
-#eval render emitTripleDhall
-
-
--- end of original emitters — new modules follow
-
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                         // Dep.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                       // `Dep.dhall` // module
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitDepDhall : Expr :=
   let depType := ("Dep", Option.some (Expr.ty "Type"),
@@ -255,6 +247,7 @@ def emitDepDhall : Expr :=
   let local_   := ("local",     Option.none, Expr.var "Dep.Local")
   let flake_   := ("flake",     Option.none, Expr.var "Dep.Flake")
   let pkgcfg   := ("pkgconfig", Option.none, Expr.var "Dep.PkgConfig")
+  
   let external := ("external",  Option.none,
     Expr.lambda "hash" (Expr.ty "Text")
       (Expr.lambda "name" (Expr.ty "Text")
@@ -277,12 +270,11 @@ def emitDepDhall : Expr :=
 
   Expr.letChain [depType, local_, flake_, pkgcfg, external, nix] exports
 
-#eval render emitDepDhall
+-- #eval render emitDepDhall
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                                     // Toolchain.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitToolchainDhall : Expr :=
   let cxxTc := ("CxxToolchain", Option.none, buildRecordType do
@@ -366,12 +358,12 @@ def emitToolchainDhall : Expr :=
      lnTc, lnDflt, nvTc, nvDflt, execPlat, execDflt]
     exports
 
-#eval render emitToolchainDhall
+-- TODO[b7r6]: decide what to do with all of these `#eval` stanzas...
+-- #eval render emitToolchainDhall
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                                        // Cxx.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitCxxDhall : Expr :=
   let cxxStdNames := ["Cxx11", "Cxx14", "Cxx17", "Cxx20", "Cxx23"]
@@ -438,26 +430,26 @@ def emitCxxDhall : Expr :=
     [d, v, cxxStd, binaryType, binaryFn, libraryType, libraryFn]
     exports
 
-#eval render emitCxxDhall
+-- TODO[b7r6]: decide what to do with all of these `#eval` stanzas...
+-- #eval render emitCxxDhall
 
-
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                         // Vis.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                       // `Vis.dhall` // module
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitVisDhall : Expr :=
   let visType := ("Vis", Option.none, emitEnum ["Public", "Private"])
+  
   let exports := buildRecord do
     field "Vis"     (Expr.var "Vis")
     field "public"  (Expr.enumVal "Vis" ["Public", "Private"] "Public")
     field "private" (Expr.enumVal "Vis" ["Public", "Private"] "Private")
+    
   Expr.letChain [visType] exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                    // Resource.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                  // `Resource.dhall` // module
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitResourceDhall : Expr :=
   let resType := ("Resource", Option.some (Expr.ty "Type"),
@@ -468,17 +460,22 @@ def emitResourceDhall : Expr :=
       ("Sandbox",    Option.some (Expr.ty "Text")),
       ("Filesystem", Option.some (Expr.ty "Text"))
     ])
+    
   let resourcesType := ("Resources", Option.some (Expr.ty "Type"),
     Expr.listOf (Expr.var "Resource"))
+    
   let pure_  := ("pure",  Option.none, Expr.emptyList (Expr.var "Resource"))
   let net    := ("network", Option.none, Expr.listLit [Expr.var "Resource.Network"])
+  
   let auth   := ("auth", Option.none,
     Expr.lambda "provider" (Expr.ty "Text")
       (Expr.listLit [Expr.app (Expr.var "Resource.Auth") (Expr.var "provider")]))
+      
   let combine := ("combine", Option.none,
     Expr.lambda "r" (Expr.var "Resources")
       (Expr.lambda "s" (Expr.var "Resources")
         (Expr.binop BinOp.listAppend (Expr.var "r") (Expr.var "s"))))
+        
   let exports := buildRecord do
     field "Resource"  (Expr.var "Resource")
     field "Resources" (Expr.var "Resources")
@@ -486,13 +483,12 @@ def emitResourceDhall : Expr :=
     field "network"   (Expr.var "network")
     field "auth"      (Expr.var "auth")
     field "combine"   (Expr.var "combine")
+    
   Expr.letChain [resType, resourcesType, pure_, net, auth, combine] exports
 
-
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                   // Haskell.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                   // `Haskell.dhall` // module
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 private def depListTy : Expr := Expr.listOf (Expr.field (Expr.var "D") "Dep")
 private def textListTy : Expr := Expr.listOf (Expr.ty "Text")
@@ -503,6 +499,7 @@ private def emptyTextList : Expr := Expr.emptyList (Expr.ty "Text")
 def emitHaskellDhall : Expr :=
   let d := ("D", Option.none, Expr.importParentFile "core/Dep.dhall")
   let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
+  
   let binaryType := ("Binary", Option.none, buildRecordType do
     field "name"     (Expr.ty "Text")
     field "srcs"     textListTy
@@ -510,6 +507,7 @@ def emitHaskellDhall : Expr :=
     field "main"     (Expr.ty "Text")
     field "ghcFlags" textListTy
     field "vis"      visTy)
+    
   let binaryFn := ("binary", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" textListTy
@@ -521,6 +519,7 @@ def emitHaskellDhall : Expr :=
             field "main"     (Expr.str "Main")
             field "ghcFlags" emptyTextList
             field "vis"      visDflt))))
+            
   let libraryType := ("Library", Option.none, buildRecordType do
     field "name"     (Expr.ty "Text")
     field "srcs"     textListTy
@@ -528,6 +527,7 @@ def emitHaskellDhall : Expr :=
     field "modules"  textListTy
     field "ghcFlags" textListTy
     field "vis"      visTy)
+    
   let libraryFn := ("library", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" textListTy
@@ -539,6 +539,7 @@ def emitHaskellDhall : Expr :=
             field "modules"  emptyTextList
             field "ghcFlags" emptyTextList
             field "vis"      visDflt))))
+            
   let ffiBinaryType := ("FFIBinary", Option.none, buildRecordType do
     field "name"     (Expr.ty "Text")
     field "srcs"     textListTy
@@ -549,6 +550,7 @@ def emitHaskellDhall : Expr :=
     field "cFlags"   textListTy
     field "ldFlags"  textListTy
     field "vis"      visTy)
+    
   let ffiBinaryFn := ("ffiBinary", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" textListTy
@@ -564,6 +566,7 @@ def emitHaskellDhall : Expr :=
               field "cFlags"   emptyTextList
               field "ldFlags"  emptyTextList
               field "vis"      visDflt)))))
+              
   let exports := buildRecord do
     field "Binary"     (Expr.var "Binary")
     field "binary"     (Expr.var "binary")
@@ -571,14 +574,18 @@ def emitHaskellDhall : Expr :=
     field "library"    (Expr.var "library")
     field "FFIBinary"  (Expr.var "FFIBinary")
     field "ffiBinary"  (Expr.var "ffiBinary")
+    
   Expr.letChain [d, v, binaryType, binaryFn, libraryType, libraryFn,
-                 ffiBinaryType, ffiBinaryFn] exports/- ════════════════════════════════════════════════════════════════════════════════
-                                                   // Rust.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+                 ffiBinaryType, ffiBinaryFn] exports
+
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                                  // Rust.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitRustDhall : Expr :=
   let d := ("D", Option.none, Expr.importParentFile "core/Dep.dhall")
   let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
+  
   let editionNames := ["E2015", "E2018", "E2021", "E2024"]
   let edition := ("Edition", Option.some (Expr.ty "Type"), emitEnum editionNames)
   let ed2021 := Expr.enumVal "Edition" editionNames "E2021"
@@ -638,19 +645,20 @@ def emitRustDhall : Expr :=
 
   Expr.letChain [d, v, edition, binaryType, binaryFn, libraryType, libraryFn] exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                                    // Genrule.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitGenruleDhall : Expr :=
   let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
+  
   let genruleType := ("Genrule", Option.none, buildRecordType do
     field "name" (Expr.ty "Text")
     field "out"  (Expr.ty "Text")
     field "cmd"  (Expr.ty "Text")
     field "srcs" textListTy
     field "vis"  visTy)
+    
   let genruleFn := ("genrule", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "out" (Expr.ty "Text")
@@ -661,26 +669,28 @@ def emitGenruleDhall : Expr :=
             field "cmd"  (Expr.var "cmd")
             field "srcs" emptyTextList
             field "vis"  visDflt))))
+            
   let exports := buildRecord do
     field "Genrule" (Expr.var "Genrule")
     field "genrule" (Expr.var "genrule")
+    
   Expr.letChain [v, genruleType, genruleFn] exports
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                   // file writing pipeline
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                             // file // writing
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 /-- All prelude modules and their output paths. -/
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                      // Lean.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                                  // Lean.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitLeanDhall : Expr :=
   let d := ("D", Option.none, Expr.importParentFile "core/Dep.dhall")
   let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
+  
   let binaryType := ("Binary", Option.none, buildRecordType do
     field "name"      (Expr.ty "Text")
     field "srcs"      textListTy
@@ -688,6 +698,7 @@ def emitLeanDhall : Expr :=
     field "root"      (Expr.ty "Text")
     field "leanFlags" textListTy
     field "vis"       visTy)
+    
   let binaryFn := ("binary", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" textListTy
@@ -699,6 +710,7 @@ def emitLeanDhall : Expr :=
             field "root"      (Expr.str "Main.lean")
             field "leanFlags" emptyTextList
             field "vis"       visDflt))))
+            
   let libraryType := ("Library", Option.none, buildRecordType do
     field "name"      (Expr.ty "Text")
     field "srcs"      textListTy
@@ -706,6 +718,7 @@ def emitLeanDhall : Expr :=
     field "root"      (Expr.ty "Text")
     field "leanFlags" textListTy
     field "vis"       visTy)
+    
   let libraryFn := ("library", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" textListTy
@@ -717,27 +730,30 @@ def emitLeanDhall : Expr :=
             field "root"      (Expr.str "lib.lean")
             field "leanFlags" emptyTextList
             field "vis"       visDflt))))
+            
   let exports := buildRecord do
     field "Binary"  (Expr.var "Binary")
     field "binary"  (Expr.var "binary")
     field "Library" (Expr.var "Library")
     field "library" (Expr.var "library")
+    
   Expr.letChain [d, v, binaryType, binaryFn, libraryType, libraryFn] exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                        // Nv.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                                    // Nv.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitNvDhall : Expr :=
   let d := ("D", Option.none, Expr.importParentFile "core/Dep.dhall")
   let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
+  
   let binaryType := ("Binary", Option.none, buildRecordType do
     field "name"  (Expr.ty "Text")
     field "srcs"  textListTy
     field "deps"  depListTy
     field "archs" textListTy
     field "vis"   visTy)
+    
   let binaryFn := ("binary", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" textListTy
@@ -747,6 +763,7 @@ def emitNvDhall : Expr :=
           field "deps"  (Expr.emptyList depListTy)
           field "archs" emptyTextList
           field "vis"   visDflt)))
+          
   let libraryType := ("Library", Option.none, buildRecordType do
     field "name"             (Expr.ty "Text")
     field "srcs"             textListTy
@@ -754,6 +771,7 @@ def emitNvDhall : Expr :=
     field "deps"             depListTy
     field "archs"            textListTy
     field "vis"              visTy)
+    
   let libraryFn := ("library", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" textListTy
@@ -764,27 +782,32 @@ def emitNvDhall : Expr :=
           field "deps"             (Expr.emptyList depListTy)
           field "archs"            emptyTextList
           field "vis"              visDflt)))
+          
   let exports := buildRecord do
     field "Binary"  (Expr.var "Binary")
     field "binary"  (Expr.var "binary")
     field "Library" (Expr.var "Library")
     field "library" (Expr.var "library")
+    
   Expr.letChain [d, v, binaryType, binaryFn, libraryType, libraryFn] exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                  // PureScript.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                            // PureScript.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitPureScriptDhall : Expr :=
   let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
-  let srcSpecNames := ["Explicit", "Glob", "Globs"]
+
+  -- TODO[b7r6]: figure out what this was for?
+  -- let srcSpecNames := ["Explicit", "Glob", "Globs"]
+  
   let srcSpec := ("SrcSpec", Option.some (Expr.ty "Type"),
     Expr.unionType [
       ("Explicit", Option.some textListTy),
       ("Glob",     Option.some (Expr.ty "Text")),
       ("Globs",    Option.some textListTy)
     ])
+    
   let appType := ("App", Option.none, buildRecordType do
     field "name"       (Expr.ty "Text")
     field "srcs"       (Expr.var "SrcSpec")
@@ -794,6 +817,7 @@ def emitPureScriptDhall : Expr :=
     field "index_html" (Expr.optionalOf (Expr.ty "Text"))
     field "style_css"  (Expr.optionalOf (Expr.ty "Text"))
     field "vis"        visTy)
+    
   let appFn := ("app", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" (Expr.var "SrcSpec")
@@ -807,12 +831,14 @@ def emitPureScriptDhall : Expr :=
             field "index_html" (Expr.some (Expr.str "index.html"))
             field "style_css"  (Expr.some (Expr.str "style.css"))
             field "vis"        visDflt))))
+            
   let binaryType := ("Binary", Option.none, buildRecordType do
     field "name"       (Expr.ty "Text")
     field "srcs"       (Expr.var "SrcSpec")
     field "spago_yaml" (Expr.ty "Text")
     field "main"       (Expr.ty "Text")
     field "vis"        visTy)
+    
   let binaryFn := ("binary", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" (Expr.var "SrcSpec")
@@ -823,11 +849,13 @@ def emitPureScriptDhall : Expr :=
             field "spago_yaml" (Expr.var "spago_yaml")
             field "main"       (Expr.str "Main")
             field "vis"        visDflt))))
+            
   let libraryType := ("Library", Option.none, buildRecordType do
     field "name"       (Expr.ty "Text")
     field "srcs"       (Expr.var "SrcSpec")
     field "spago_yaml" (Expr.optionalOf (Expr.ty "Text"))
     field "vis"        visTy)
+    
   let libraryFn := ("library", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" (Expr.var "SrcSpec")
@@ -836,6 +864,7 @@ def emitPureScriptDhall : Expr :=
           field "srcs"       (Expr.var "srcs")
           field "spago_yaml" (Expr.none (Expr.ty "Text"))
           field "vis"        visDflt)))
+          
   let exports := buildRecord do
     field "App"     (Expr.var "App")
     field "app"     (Expr.var "app")
@@ -844,15 +873,25 @@ def emitPureScriptDhall : Expr :=
     field "Library" (Expr.var "Library")
     field "library" (Expr.var "library")
     field "SrcSpec" (Expr.var "SrcSpec")
-  Expr.letChain [v, srcSpec, appType, appFn, binaryType, binaryFn, libraryType, libraryFn] exports
+    
+  Expr.letChain [
+    v,
+    srcSpec,
+    appType,
+    appFn,
+    binaryType,
+    binaryFn,
+    libraryType,
+    libraryFn
+  ] exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                     // NixCxx.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                                // NixCxx.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitNixCxxDhall : Expr :=
   let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
+  
   let nixBinaryType := ("NixBinary", Option.none, buildRecordType do
     field "name"           (Expr.ty "Text")
     field "srcs"           textListTy
@@ -861,6 +900,7 @@ def emitNixCxxDhall : Expr :=
     field "compiler_flags" textListTy
     field "linker_flags"   textListTy
     field "vis"            visTy)
+    
   let nixBinaryFn := ("nixBinary", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "srcs" textListTy
@@ -873,18 +913,20 @@ def emitNixCxxDhall : Expr :=
             field "compiler_flags" emptyTextList
             field "linker_flags"   emptyTextList
             field "vis"            visDflt))))
+            
   let exports := buildRecord do
     field "NixBinary" (Expr.var "NixBinary")
     field "nixBinary" (Expr.var "nixBinary")
+    
   Expr.letChain [v, nixBinaryType, nixBinaryFn] exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                  // RustCrate.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                             // RustCrate.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitRustCrateDhall : Expr :=
   let v := ("V", Option.none, Expr.importParentFile "core/Vis.dhall")
+  
   let cratesIoType := ("CratesIo", Option.none, buildRecordType do
     field "name"       (Expr.ty "Text")
     field "version"    (Expr.ty "Text")
@@ -893,6 +935,7 @@ def emitRustCrateDhall : Expr :=
     field "deps"       textListTy
     field "proc_macro" (Expr.ty "Bool")
     field "vis"        visTy)
+    
   let cratesIoFn := ("cratesIo", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "version" (Expr.ty "Text")
@@ -905,12 +948,14 @@ def emitRustCrateDhall : Expr :=
             field "deps"       emptyTextList
             field "proc_macro" Expr.ff
             field "vis"        visDflt))))
+            
   let httpArchiveType := ("HttpArchive", Option.none, buildRecordType do
     field "name"         (Expr.ty "Text")
     field "url"          (Expr.ty "Text")
     field "sha256"       (Expr.ty "Text")
     field "strip_prefix" (Expr.optionalOf (Expr.ty "Text"))
     field "vis"          visTy)
+    
   let httpArchiveFn := ("httpArchive", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "url" (Expr.ty "Text")
@@ -921,17 +966,18 @@ def emitRustCrateDhall : Expr :=
             field "sha256"       (Expr.var "sha256")
             field "strip_prefix" (Expr.none (Expr.ty "Text"))
             field "vis"          visDflt))))
+            
   let exports := buildRecord do
     field "CratesIo"    (Expr.var "CratesIo")
     field "cratesIo"    (Expr.var "cratesIo")
     field "HttpArchive" (Expr.var "HttpArchive")
     field "httpArchive" (Expr.var "httpArchive")
+    
   Expr.letChain [v, cratesIoType, cratesIoFn, httpArchiveType, httpArchiveFn] exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                      // Rule.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                                  // Rule.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitRuleDhall : Expr :=
   let c  := ("C",  Option.none, Expr.importParentFile "lang/Cxx.dhall")
@@ -989,9 +1035,9 @@ def emitRuleDhall : Expr :=
   Expr.letChain [c, r, h, l, n, ps, g, nc, rc, ruleType] exports
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                // package.dhall (top-level)
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                               // package.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitPackageDhall : Expr :=
   let triple := ("Triple", Option.none, Expr.importFile "core/Triple.dhall")
@@ -1029,14 +1075,30 @@ def emitPackageDhall : Expr :=
       field "RustCrate"  (Expr.var "RC"))
     field "rule"     (Expr.var "Rule")
 
-  Expr.letChain [triple, dep, vis, res, tc, cxx, hs, rs, ln, nv, ps, gen, nc, rc, rule] exports
+  Expr.letChain [
+    triple,
+    dep,
+    vis,
+    res,
+    tc,
+    cxx,
+    hs,
+    rs,
+    ln,
+    nv,
+    ps,
+    gen,
+    nc,
+    rc,
+    rule
+  ] exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                          // render/buck2/Rule.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                                  // Rule.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitBzlRuleDhall : Expr :=
+
   let attrType := ("AttrType", Option.some (Expr.ty "Type"), Expr.unionType [
     ("String",       Option.some (buildRecordType do field "default" (Expr.optionalOf (Expr.ty "Text")))),
     ("StringList",   Option.some (buildRecordType (pure ()))),
@@ -1053,68 +1115,91 @@ def emitBzlRuleDhall : Expr :=
     ("Label",        Option.some (buildRecordType (pure ()))),
     ("StringDict",   Option.some (buildRecordType (pure ())))
   ])
+  
   let attr := ("Attr", Option.none, buildRecordType do
     field "name" (Expr.ty "Text"); field "type" (Expr.var "AttrType"); field "doc" (Expr.ty "Text"))
+    
   let load := ("Load", Option.none, buildRecordType do
     field "bzl" (Expr.ty "Text"); field "symbols" textListTy)
+    
   let providerField := ("ProviderField", Option.some (Expr.ty "Type"), Expr.unionType [
     ("Typed",  Option.some (buildRecordType do
       field "name" (Expr.ty "Text"); field "type" (Expr.ty "Text")
       field "default" (Expr.optionalOf (Expr.ty "Text")))),
     ("Simple", Option.some (Expr.ty "Text"))])
+    
   let providerDef := ("ProviderDef", Option.none, buildRecordType do
     field "name" (Expr.ty "Text"); field "fields" (Expr.listOf (Expr.var "ProviderField")))
+    
   let helperFn := ("HelperFn", Option.none, buildRecordType do
     field "name" (Expr.ty "Text"); field "params" textListTy
     field "returnType" (Expr.optionalOf (Expr.ty "Text")); field "body" (Expr.ty "Text"))
+    
   let ruleImpl := ("RuleImpl", Option.none, buildRecordType do
     field "name" (Expr.ty "Text"); field "doc" (Expr.ty "Text")
     field "body" (Expr.ty "Text"); field "is_toolchain" (Expr.ty "Bool"))
+    
   let ruleEntry := Expr.listOf (buildRecordType do
     field "impl" (Expr.var "RuleImpl"); field "attrs" (Expr.listOf (Expr.var "Attr")))
+    
   let bzlFile := ("BzlFile", Option.none, buildRecordType do
     field "header" (Expr.ty "Text"); field "loads" (Expr.listOf (Expr.var "Load"))
     field "globals" (Expr.ty "Text"); field "providers" (Expr.listOf (Expr.var "ProviderDef"))
     field "helpers" (Expr.listOf (Expr.var "HelperFn")); field "rules" ruleEntry)
+    
   let exports := buildRecord do
     field "AttrType" (Expr.var "AttrType"); field "Attr" (Expr.var "Attr")
     field "Load" (Expr.var "Load"); field "ProviderDef" (Expr.var "ProviderDef")
     field "ProviderField" (Expr.var "ProviderField"); field "HelperFn" (Expr.var "HelperFn")
     field "RuleImpl" (Expr.var "RuleImpl"); field "BzlFile" (Expr.var "BzlFile")
-  Expr.letChain [attrType, attr, load, providerField, providerDef, helperFn, ruleImpl, bzlFile] exports
+    
+  Expr.letChain [
+    attrType, 
+    attr,
+    load,
+    providerField,
+    providerDef,
+    helperFn,
+    ruleImpl,
+    bzlFile
+  ] exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                          // render/buck2/package.dhall
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                               // package.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitBzlPackageDhall : Expr :=
   let r := ("R", Option.none, Expr.importFile "Rule.dhall")
+  
   let exports := buildRecord do
     field "Rule" (Expr.var "R")
+    
   Expr.letChain [r] exports
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                          // Prelude.dhall (utility functions)
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                               // Prelude.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitPreludeDhall : Expr :=
   -- concatSep: join a list of text with a separator
   let concatSep := ("concatSep", Option.none,
     Expr.lambda "sep" (Expr.ty "Text")
       (Expr.lambda "xs" (Expr.listOf (Expr.ty "Text"))
-        (Expr.var "xs")))  -- note: real impl uses List/fold; simplified here
+        (Expr.var "xs")))  -- TODO[b7r6]: real implementation uses List/fold
+        
   let exports := buildRecord do
     field "Text" (buildRecord do field "concatSep" (Expr.var "concatSep"))
+    
   Expr.letChain [concatSep] exports
 
 
-/- ════════════════════════════════════════════════════════════════════════════════
-                                                   // Library.dhall module
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                               // Library.dhall
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def emitLibraryDhall : Expr :=
+
   -- LibDep: what a project declares it needs (unresolved)
   let libDep := ("LibDep", Option.none, buildRecordType do
     field "name"     (Expr.ty "Text")
@@ -1122,6 +1207,7 @@ def emitLibraryDhall : Expr :=
     field "flakeDev" (Expr.optionalOf (Expr.ty "Text"))
     field "libs"     textListTy
     field "pc"       (Expr.optionalOf (Expr.ty "Text")))
+    
   let libDepFn := ("libDep", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "flake" (Expr.ty "Text")
@@ -1138,6 +1224,7 @@ def emitLibraryDhall : Expr :=
     field "includeDir" (Expr.ty "Text")
     field "libDir"     (Expr.ty "Text")
     field "libs"       textListTy)
+    
   let resolvedLibFn := ("resolvedLib", Option.none,
     Expr.lambda "name" (Expr.ty "Text")
       (Expr.lambda "includeDir" (Expr.ty "Text")
@@ -1153,6 +1240,7 @@ def emitLibraryDhall : Expr :=
   let libSpec := ("LibSpec", Option.none, buildRecordType do
     field "cxx"     (Expr.listOf (Expr.var "ResolvedLib"))
     field "haskell" textListTy)
+    
   let libSpecFn := ("libSpec", Option.none,
     buildRecord do
       field "cxx"     (Expr.emptyList (Expr.var "ResolvedLib"))
@@ -1170,10 +1258,9 @@ def emitLibraryDhall : Expr :=
     [libDep, libDepFn, resolvedLib, resolvedLibFn, libSpec, libSpecFn]
     exports
 
-
-/- ════════════════════════════════════════════════════════════════════════════════
-                                               // final prelude file list
-   ════════════════════════════════════════════════════════════════════════════════ -/
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                            // prelude // files
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
 def preludeFiles : List (String × Expr) :=
   [ ("core/Triple.dhall",            emitTripleDhall)
@@ -1198,5 +1285,11 @@ def preludeFiles : List (String × Expr) :=
   , ("render/buck2/package.dhall",   emitBzlPackageDhall)
   ]
 
+/- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                                       // tests
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+
+-- TODO[b7r6]: decide what to do with all of these `#eval` stanzas...
+-- #eval render emitTripleDhall
 
 end Continuity.Codegen.Build

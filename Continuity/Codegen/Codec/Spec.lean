@@ -1,5 +1,5 @@
-import Continuity.Emit.Cpp.Ast
-import Continuity.Emit.Haskell.Ast
+import Continuity.Codegen.AST.Cpp.Ast
+import Continuity.Codegen.AST.Haskell.Ast
 
 set_option autoImplicit false
 

@@ -20,7 +20,7 @@ Continuity has five layers. Each depends only on layers below it.
 │  Codec Layer                                        │
 │  Box, Scanner, Parser, Bytes, Guards, Varint        │
 │  Protocol, Limits                                   │
-│  Nix, Protobuf, Git, HTTP/1-2-3, ZMTP, SAML, EVM   │
+│  Nix, Protobuf, Git, HTTP/1-2-3, ZMTP, SAML, EVM    │
 │  Json, Dhall                                        │
 ├─────────────────────────────────────────────────────┤
 │  Build Model                                        │
@@ -34,13 +34,13 @@ Continuity has five layers. Each depends only on layers below it.
 ## Data Flow
 
 ```
-tools.dhall ──→ InitBuck2 ──→ .buckconfig
-                             toolchains/*.bzl
-                             .buckroot
+tools.dhall → InitBuck2 → .buckconfig
+                          .buckroot
+                          toolchains/*.bzl
 
-Lean types  ──→ ToDhall   ──→ 19 Dhall files (build prelude)
-            ──→ ToCpp     ──→ 13 C++ headers (codec types + stubs)
-            ──→ ToHaskell ──→ 13 Haskell modules (codec types + parsers)
+Lean types → ToDhall   → 19 Dhall files (build prelude)
+           → ToCpp     → 13 C++ headers (codec types + stubs)
+           → ToHaskell → 13 Haskell modules (codec types + parsers)
 ```
 
 ## Codec Architecture
@@ -85,7 +85,7 @@ def isoBox (box : Box α) (f : α → β) (g : β → α) ... : Box β
 ## CAS Stack
 
 ```
-ByteArray ──→ SHA256.hash ──→ SHA256Hash (32 bytes, proven)
+ByteArray → SHA256.hash → SHA256Hash (32 bytes, proven)
                                   │
                                   ▼
                               CAS.Digest (hash + size)
@@ -106,9 +106,9 @@ intents that the event loop translates to system calls.
 
 ```
                     ┌───────────────────────┐
-                    │  StateMachine.lean     │
-                    │  ServerState × Event   │
-                    │  → ServerState × [Act] │
+                    │  StateMachine.lean    │
+                    │  ServerState × Event  │
+                    │  → ServerState × [Act]│
                     └───────────┬───────────┘
                                 │ intents
                     ┌───────────▼───────────┐

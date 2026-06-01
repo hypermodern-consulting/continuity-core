@@ -1,12 +1,12 @@
 import Continuity.Codegen.Codec.Spec
-import Continuity.Emit.Haskell.Ast
-import Continuity.Emit.Haskell.Render
+import Continuity.Codegen.AST.Haskell.Ast
+import Continuity.Codegen.AST.Haskell.Render
 
 set_option autoImplicit false
 
 namespace Continuity.Codegen.Codec
 
-open Continuity.Emit.Haskell
+open Continuity.Codegen.AST.Haskell
 
 private def wireTypeToHsType : WireType → HsType
   | .u8 => HsType.con "Word8"
@@ -46,12 +46,12 @@ private def enumFromCodeFn (e : EnumSpec) : HsDecl :=
 
 private def lcFirst (s : String) : String :=
   match s.toList with
-  | c :: rest => String.mk (c.toLower :: rest)
+  | c :: rest => String.ofList (c.toLower :: rest)
   | [] => s
 
 private def ucFirst (s : String) : String :=
   match s.toList with
-  | c :: rest => String.mk (c.toUpper :: rest)
+  | c :: rest => String.ofList (c.toUpper :: rest)
   | [] => s
 
 private def escapeHsKeyword (s : String) : String :=
