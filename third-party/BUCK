@@ -1,10 +1,13 @@
 # third-party/BUCK — C++ libraries resolved by Nix
 #
-# Paths come from .buckconfig.local [lib.*] sections.
+# Absolute Nix store paths go through -isystem flags, not header_dirs
+# (Buck2 header_dirs requires relative source paths).
 
 prebuilt_cxx_library(
     name = "curl",
-    header_dirs = [read_root_config("lib.curl", "include", "")],
+    exported_preprocessor_flags = [
+        "-isystem", read_root_config("lib.curl", "include", ""),
+    ],
     exported_linker_flags = [
         "-L" + read_root_config("lib.curl", "lib", ""),
         "-lcurl",
@@ -14,7 +17,9 @@ prebuilt_cxx_library(
 
 prebuilt_cxx_library(
     name = "zlib",
-    header_dirs = [read_root_config("lib.zlib", "include", "")],
+    exported_preprocessor_flags = [
+        "-isystem", read_root_config("lib.zlib", "include", ""),
+    ],
     exported_linker_flags = [
         "-L" + read_root_config("lib.zlib", "lib", ""),
         "-lz",
@@ -24,7 +29,9 @@ prebuilt_cxx_library(
 
 prebuilt_cxx_library(
     name = "openssl",
-    header_dirs = [read_root_config("lib.openssl", "include", "")],
+    exported_preprocessor_flags = [
+        "-isystem", read_root_config("lib.openssl", "include", ""),
+    ],
     exported_linker_flags = [
         "-L" + read_root_config("lib.openssl", "lib", ""),
         "-lssl",
@@ -35,7 +42,9 @@ prebuilt_cxx_library(
 
 prebuilt_cxx_library(
     name = "simdjson",
-    header_dirs = [read_root_config("lib.simdjson", "include", "")],
+    exported_preprocessor_flags = [
+        "-isystem", read_root_config("lib.simdjson", "include", ""),
+    ],
     exported_linker_flags = [
         "-L" + read_root_config("lib.simdjson", "lib", ""),
         "-lsimdjson",

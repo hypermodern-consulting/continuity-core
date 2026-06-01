@@ -1313,7 +1313,8 @@ private def nvCompileFlags (std : String) : List SStmt :=
       .str "-x", .str "cuda",
       .binop "+" (.str "--cuda-path=") (.var "nvidia_sdk_path"),
       .str "-isystem", .var "nvidia_sdk_include",
-      .str s!"-std={std}", .str "-c"])
+      .str s!"-std={std}", .str "-c",
+      .str "-fno-zero-call-used-regs=used"])
   , .ifStmt [(.var "ptxas", [
       .expr (.methodCall (.var "compile_flags") "extend"
         [.list [.binop "+" (.str "--ptxas-path=") (.var "ptxas")]] [])

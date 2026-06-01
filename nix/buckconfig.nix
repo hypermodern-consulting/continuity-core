@@ -76,7 +76,7 @@ let
     ptxas = ${cuda.cuda_nvcc}/bin/ptxas
     fatbinary = ${cuda.cuda_nvcc}/bin/fatbinary
     archs = sm_90
-    clang = ${llvm.clang-unwrapped}/bin/clang++
+    clang = ${llvm.clang}/bin/clang++
   '');
 
   purescriptSection = optional toolchains.purescript ''
