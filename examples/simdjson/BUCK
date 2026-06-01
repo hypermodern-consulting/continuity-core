@@ -1,11 +1,8 @@
-# simdjson example
-#
-# Requires: simdjson library
-# Resolve via .buckconfig.local [cxx] section or pkg-config (TODO).
-
 cxx_binary(
     name = "twitter",
     srcs = ["twitter.cpp"],
-    compiler_flags = ["-std=c++20", "-O2"],
+    deps = [
+        "//third-party:simdjson",
+    ],
     visibility = ["PUBLIC"],
 )

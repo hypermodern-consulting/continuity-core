@@ -89,6 +89,7 @@
         (lib.optionals cfg.toolchains.cuda [
           pkgs.cudaPackages.cuda_nvcc
           pkgs.cudaPackages.cuda_cudart
+          pkgs.llvmPackages_19.clang-unwrapped  # direct GC root — buckconfig references this
         ])
       ];
     in
@@ -196,6 +197,7 @@
             ];
             shellHook = ''
               if [ -f lakefile.lean ] || [ -f BUCK ]; then
+                rm -f .buckconfig.local
                 ln -sf ${buckconfig} .buckconfig.local
               fi
             '';

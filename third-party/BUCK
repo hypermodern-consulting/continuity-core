@@ -1,0 +1,27 @@
+# third-party/BUCK — generated from continuity library spec
+#
+# Each target reads include/lib paths from .buckconfig.local [lib.*] sections.
+# Nix resolves store paths; this file just references them.
+
+def _lib(name):
+    """Create a prebuilt_cxx_library from buckconfig [lib.name] section."""
+    include = read_root_config("lib.{}".format(name), "include", "")
+    lib_dir = read_root_config("lib.{}".format(name), "lib", "")
+    libs = read_root_config("lib.{}".format(name), "libs", "")
+
+    if not include:
+        fail("Library '{}' not configured. Add to continuity.libraries.cxx in flake.nix".format(name))
+
+    prebuilt_cxx_library(
+        name = name,
+        header_dirs = [include],
+        exported_linker_flags = [
+            "-L" + lib_dir,
+        ] + libs.split(" "),
+        visibility = ["PUBLIC"],
+    )
+
+_lib("curl")
+_lib("zlib")
+_lib("openssl")
+_lib("simdjson")

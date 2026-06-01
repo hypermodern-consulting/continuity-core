@@ -1,15 +1,10 @@
-# Multi-dependency C++ example
-#
-# Requires: zlib, openssl, curl
-# These are resolved via compiler_flags/linker_flags from .buckconfig.local,
-# not hardcoded Nix store paths.
-#
-# In your flake module, add to extrabuckconfigsections or use
-# pkg-config integration (TODO).
-
 cxx_binary(
     name = "multi-dep",
     srcs = ["main.cpp"],
-    compiler_flags = ["-std=c++17", "-O2", "-Wall"],
+    deps = [
+        "//third-party:curl",
+        "//third-party:zlib",
+        "//third-party:openssl",
+    ],
     visibility = ["PUBLIC"],
 )

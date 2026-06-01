@@ -2,9 +2,11 @@ load("@toolchains//:purescript.bzl", "purescript_app")
 
 purescript_app(
     name = "halogen-todo",
-    srcs = glob(["src/**/*.purs"]),
-    spago_yaml = "spago.yaml",
-    main = "Main",
+    srcs = [
+        "src/Main.purs",
+        "src/Component/Todo.purs",
+    ],
+    spago_dhall = "spago.dhall",
     index_html = "index.html",
     style_css = "style.css",
 )
