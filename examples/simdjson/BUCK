@@ -1,8 +1,0 @@
-cxx_binary(
-    name = "twitter",
-    srcs = ["twitter.cpp"],
-    deps = [
-        "//third-party:simdjson",
-    ],
-    visibility = ["PUBLIC"],
-)

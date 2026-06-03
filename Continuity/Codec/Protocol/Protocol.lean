@@ -2,17 +2,16 @@ import Continuity.Codec.Core.Box
 import Continuity.Codec.Core.Bytes
 
 set_option autoImplicit false
+set_option warningAsError false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      "He was a specialist in the extraction of top executives
-      and research people. He maintained a careful library of
-      protocol masks, each one a precise frame for a specific
-      class of operation, each one tested against the security
-      lattice that interlocked across his field of work. The
-      extraction itself was almost secondary: what mattered was
-      the choice of interface, the clean fit between the target's
-      shape and the codec you'd selected to carry it out."
+      "Turner had been a soldier in his own right for most of his adult life,
+      although he’d never worn a uniform. A mercenary, his employers vast
+      corporations warring covertly for the control of entire economies. He was
+      a specialist in the extraction of top executives and research people.
+      The multinationals he worked for would never admit that men like Turner
+      existed . . ."
 
                                                                     — Count Zero
 
@@ -20,156 +19,6 @@ set_option autoImplicit false
 
 namespace Continuity.Codec.Protocol.Protocol
 
-/-
-  Protocol framing and length-codec primitives.
-
-  Defines `Frame`, `LengthCodec`, and `BoundedFrame` as the
-  building blocks for network protocol parsing. Wire-format
-  length codecs for `Git` pkt-line, `Nix` daemon, and `Zmtp`
-  3.x are provided as concrete instances.
--/
-
-open Continuity.Codec.Core.Box Continuity.Codec.Core.Bytes
-
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                            // core // frame
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-@[ext] structure Frame where
-  payload : Bytes
-  deriving Repr, DecidableEq
-
-def Frame.flush : Frame := ⟨ByteArray.empty⟩
-def Frame.isFlush (f : Frame) : Bool := f.payload.size == 0
-
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                           // core // codec
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-structure LengthCodec where
-  fixedSize : Nat
-  maxPayload : Nat
-  encode : Nat → Bytes
-  decode : Bytes → Option (Nat × Nat)
-  roundtrip : ∀ n, n ≤ maxPayload → decode (encode n) = some (n, fixedSize)
-  encode_size : ∀ n, (encode n).size = fixedSize
-  decode_append : ∀ n extra, n ≤ maxPayload →
-    decode (encode n ++ extra) = some (n, fixedSize)
-
-structure BoundedFrame (codec : LengthCodec) where
-  frame : Frame
-  bound : frame.payload.size ≤ codec.maxPayload
-
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                       // encoding // hex
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
--- hex encoding for `Git` `pkt-line`
-def toHexChar (n : Nat) : UInt8 :=
-  if n < 10 then (48 + n).toUInt8 else (87 + n).toUInt8
-
-def fromHexChar (c : UInt8) : Option Nat :=
-  if c >= 48 && c <= 57 then some (c.toNat - 48)
-  else if c >= 97 && c <= 102 then some (c.toNat - 87)
-  else if c >= 65 && c <= 70 then some (c.toNat - 55)
-  else none
-
-theorem fromHexChar_toHexChar (n : Nat) (h : n < 16) :
-    fromHexChar (toHexChar n) = some n := by
-  match n, h with
-  | 0, _ => rfl | 1, _ => rfl | 2, _ => rfl | 3, _ => rfl
-  | 4, _ => rfl | 5, _ => rfl | 6, _ => rfl | 7, _ => rfl
-  | 8, _ => rfl | 9, _ => rfl | 10, _ => rfl | 11, _ => rfl
-  | 12, _ => rfl | 13, _ => rfl | 14, _ => rfl | 15, _ => rfl
-  | n + 16, h => nomatch (Nat.not_lt.mpr (Nat.le_add_left 16 n) h)
-
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                // encoding // wire-format
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-def gitEncodeLength (payloadLen : Nat) : Bytes :=
-  let totalLen := payloadLen + 4
-  [toHexChar ((totalLen / 4096) % 16), toHexChar ((totalLen / 256) % 16),
-   toHexChar ((totalLen / 16) % 16), toHexChar (totalLen % 16)].toByteArray
-
-def gitDecodeLength (bs : Bytes) : Option (Nat × Nat) :=
-  if bs.size >= 4 then
-    match fromHexChar bs.data[0]!, fromHexChar bs.data[1]!,
-          fromHexChar bs.data[2]!, fromHexChar bs.data[3]! with
-    | some d0, some d1, some d2, some d3 =>
-      let totalLen := d0 * 4096 + d1 * 256 + d2 * 16 + d3
-      if totalLen >= 4 then some (totalLen - 4, 4)
-      else if totalLen == 0 then some (0, 4)
-      else none
-    | _, _, _, _ => none
-  else none
-
-def nixEncodeLength (n : Nat) : Bytes := u64le.serialize n.toUInt64
-
-def nixDecodeLength (bs : Bytes) : Option (Nat × Nat) :=
-  match u64le.parse bs with
-  | .ok len _ => some (len.toNat, 8)
-  | .fail => none
-
-def zmtpEncodeLength (n : Nat) : Bytes :=
-  if n < 255 then ⟨#[n.toUInt8]⟩
-  else ⟨#[0xFF]⟩ ++ u64le.serialize n.toUInt64
-
-def zmtpDecodeLength (bs : Bytes) : Option (Nat × Nat) :=
-  if h : bs.size > 0 then
-    let b := bs.data[0]!
-    if b == 0xFF then
-      if bs.size >= 9 then
-        match u64le.parse (bs.extract 1 bs.size) with
-        | .ok len _ => some (len.toNat, 9)
-        | .fail => none
-      else none
-    else some (b.toNat, 1)
-  else none
-
-def gitLengthCodec : LengthCodec where
-  fixedSize := 4
-  maxPayload := 65531
-  encode := gitEncodeLength
-  decode := gitDecodeLength
-  roundtrip := by
-    intro n h
-    sorry
-  encode_size := by
-    intro n
-    sorry
-  decode_append := by
-    intro n extra h
-    sorry
-
-def nixLengthCodec : LengthCodec where
-  fixedSize := 8
-  maxPayload := 18446744073709551615
-  encode := nixEncodeLength
-  decode := nixDecodeLength
-  roundtrip := by
-    intro n h
-    sorry
-  encode_size := by
-    intro n
-    sorry
-  decode_append := by
-    intro n extra h
-    sorry
-
-def zmtpLengthCodec : LengthCodec where
-  fixedSize := 9
-  maxPayload := 18446744073709551615
-  encode := zmtpEncodeLength
-  decode := zmtpDecodeLength
-  roundtrip := by
-    intro n h
-    sorry
-  encode_size := by
-    intro n
-    sorry
-  decode_append := by
-    intro n extra h
-    sorry
+-- TODO[b7r6]: port from continuity v13
 
 end Continuity.Codec.Protocol.Protocol

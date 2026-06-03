@@ -26,7 +26,7 @@ set_option autoImplicit false
       address was the shape of the content itself. No index, no
       lookup table — just the hash, and the hash was the key."
 
-                                                                     — Count Zero
+                                                                    — Count Zero
 
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
 
@@ -60,8 +60,11 @@ structure Digest where
 def digest (content : ByteArray) : Digest :=
   ⟨hashToSHA256 content, content.size⟩
 
-theorem digest_deterministic (a : ByteArray) : digest a = digest a := rfl
-theorem digest_functional (a b : ByteArray) (h : a = b) : digest a = digest b := by rw [h]
+theorem digest_deterministic (a : ByteArray) : digest a = digest a :=
+  by rfl
+
+theorem digest_functional (a b : ByteArray) (h : a = b) : digest a = digest b :=
+  by rw [h]
 
 -- content-addressed put: hash determines the key
 def put (content : ByteArray) : Digest := digest content

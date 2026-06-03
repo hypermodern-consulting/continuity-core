@@ -29,7 +29,7 @@ namespace Continuity.Codegen.AST.Starlark
 -/
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                      // expression // shortcuts
+---                                                   // expression // shortcuts
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 -- one-liner expression constructors. same role as `E` in `Haskell` / `C` in `Cpp`.
@@ -50,7 +50,7 @@ def binop (op : String) (l r : SExpr) : SExpr := .binop op l r
 end E
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                        // statement // builder
+---                                                      // statement // builder
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 -- accumulates starlark statements. use with `buildStmts do ...`
@@ -74,7 +74,7 @@ def buildStmts (m : StmtM Unit) : List SStmt :=
   stmts
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                                       // tests
+---                                                                     // tests
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 -- TODO[b7r6]: !! write real tests !!

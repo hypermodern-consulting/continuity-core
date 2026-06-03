@@ -5,22 +5,22 @@ set_option autoImplicit false
 
 /- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      "the breakers rolled in, their edges transparent
-      as green glass, and beneath them the tide pulled
-      everything toward some invisible destination. Each
-      wave carried a method inscribed in its crest — GET,
-      POST, the ancient verbs of an older sea — followed
-      by a train of headers that described what the wave
-      wanted, what it was willing to accept, how long it
-      would wait. The shore was nothing but an agreement,
-      a status code returned in the undertow, and when
-      the wave broke it left behind a body — or nothing
-      at all."
+     "The episode seemed to be reaching some sort of climax—an antique BMW
+      fuel-cell conversion had just been strafed by servo-piloted miniature
+      West German helicopters on the street below Covina Concourse Courts,
+      Michele Morgan Magnum was pistol-whipping her treacherous personal
+      secretary with a nickel-plated Nambu, and Suslov, who Bobby was coming
+      increasingly to identify with, was casually preparing to get his ass out
+      of town with a gorgeous female bodyguard who was Japanese but reminded
+      Bobby intensely of another one of the dreamgirls on his holoporn
+      unit—when someone screamed."
 
                                                                     — Count Zero
 
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -/
+    
 namespace Continuity.Codec.Protocol.Http
+
 /-
   The HTTP Protocol (RFC 9110).
 
@@ -33,69 +33,6 @@ namespace Continuity.Codec.Protocol.Http
   by `Content-Length` or `Transfer-Encoding: chunked`.
 -/
 
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                  // core // method and header
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-open Continuity.Codec.Core.Box
-
-inductive Method where
-  | get | head | post | put | delete | connect | options | trace | patch
-  deriving Repr, DecidableEq
-
-def Method.toString : Method → String
-  | .get => "GET" | .head => "HEAD" | .post => "POST" | .put => "PUT"
-  | .delete => "DELETE" | .connect => "CONNECT" | .options => "OPTIONS"
-  | .trace => "TRACE" | .patch => "PATCH"
-
-structure Header where
-  name : String
-  value : String
-  deriving Repr, DecidableEq
-
-structure RequestLine where
-  method : Method
-  target : String
-  version : String
-  deriving Repr
-
-structure StatusLine where
-  version : String
-  statusCode : Nat
-  reasonPhrase : String
-  deriving Repr
-
-structure Request where
-  requestLine : RequestLine
-  headers : List Header
-  body : Option Bytes
-
-structure Response where
-  statusLine : StatusLine
-  headers : List Header
-  body : Option Bytes
-
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                 // parse // request utilities
---- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-def CRLF : Bytes := "\r\n".toUTF8
-
-def parseMethod (s : String) : Option Method :=
-  match s with
-  | "GET" => some .get | "HEAD" => some .head | "POST" => some .post
-  | "PUT" => some .put | "DELETE" => some .delete | "CONNECT" => some .connect
-  | "OPTIONS" => some .options | "TRACE" => some .trace | "PATCH" => some .patch
-  | _ => none
-
-def findHeader (name : String) (headers : List Header) : Option String :=
-  headers.find? (fun h => h.name.toLower == name.toLower) |>.map Header.value
-
-def contentLength (headers : List Header) : Option Nat :=
-  findHeader "content-length" headers |>.bind String.toNat?
-
-inductive TransferEncoding where
-  | identity | chunked | gzip | deflate | compress
-  deriving Repr, DecidableEq
+-- TODO[b7r6]: port from continuity v13
 
 end Continuity.Codec.Protocol.Http

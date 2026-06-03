@@ -41,7 +41,7 @@ namespace Continuity.Codegen.Algebra.Effect
 open Continuity.Algebra.Grade
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                       // emit // label
+---                                                             // emit // label
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def emitLabel : Label → String
@@ -66,7 +66,7 @@ theorem emit_crypto : emitLabel .Crypto = "Crypto" := rfl
 theorem emit_time : emitLabel .Time = "Time" := rfl
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                       // emit // grade
+---                                                             // emit // grade
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def emitGrade (g : Grade) : String :=
@@ -77,7 +77,7 @@ theorem emit_unit : emitGrade [] = "'[]" := rfl
 theorem emit_net_crypto : emitGrade [.Net, .Crypto] = "'[Net, Crypto]" := rfl
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                     // emit // module
+---                                                            // emit // module
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def emitDataDecl : String :=
@@ -143,7 +143,7 @@ def emitGradeModule : String :=
 theorem module_deterministic : emitGradeModule = emitGradeModule := rfl
 
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
----                                                       // emit // c++
+---                                                               // emit // c++
 --- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def emitCppGradeEnum : String :=
